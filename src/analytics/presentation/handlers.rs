@@ -6,16 +6,30 @@ use crate::analytics::application::service::AnalyticsService;
 use crate::shared::error::AppError;
 use crate::shared::types::AuthUser;
 
+fn parse_date(s: &str) -> Result<NaiveDate, AppError> {
+    // Try ISO datetime first, extract date part
+    if s.contains('T') {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {
+            return Ok(dt.naive_utc().date());
+        }
+        if let Ok(dt) = s.parse::<chrono::DateTime<chrono::Utc>>() {
+            return Ok(dt.naive_utc().date());
+        }
+    }
+    NaiveDate::parse_from_str(s, "%Y-%m-%d")
+        .map_err(|_| AppError::bad_request("Invalid date format"))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct DateRangeQuery {
-    pub start: NaiveDate,
-    pub end: NaiveDate,
+    pub start: String,
+    pub end: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct TopClientsQuery {
-    pub start: NaiveDate,
-    pub end: NaiveDate,
+    pub start: String,
+    pub end: String,
     pub limit: Option<i64>,
 }
 
@@ -24,7 +38,7 @@ pub async fn overview(
     svc: web::Data<AnalyticsService>,
     query: web::Query<DateRangeQuery>,
 ) -> Result<HttpResponse, AppError> {
-    let stats = svc.overview(&[user.id], query.start, query.end).await?;
+    let stats = svc.overview(&[user.id], parse_date(&query.start)?, parse_date(&query.end)?).await?;
     Ok(HttpResponse::Ok().json(stats))
 }
 
@@ -34,7 +48,7 @@ pub async fn revenue_by_month(
     query: web::Query<DateRangeQuery>,
 ) -> Result<HttpResponse, AppError> {
     let data = svc
-        .revenue_by_month(&[user.id], query.start, query.end)
+        .revenue_by_month(&[user.id], parse_date(&query.start)?, parse_date(&query.end)?)
         .await?;
     Ok(HttpResponse::Ok().json(data))
 }
@@ -45,7 +59,7 @@ pub async fn sessions_by_month(
     query: web::Query<DateRangeQuery>,
 ) -> Result<HttpResponse, AppError> {
     let data = svc
-        .sessions_by_month(&[user.id], query.start, query.end)
+        .sessions_by_month(&[user.id], parse_date(&query.start)?, parse_date(&query.end)?)
         .await?;
     Ok(HttpResponse::Ok().json(data))
 }
@@ -56,7 +70,7 @@ pub async fn client_growth(
     query: web::Query<DateRangeQuery>,
 ) -> Result<HttpResponse, AppError> {
     let data = svc
-        .client_growth(&[user.id], query.start, query.end)
+        .client_growth(&[user.id], parse_date(&query.start)?, parse_date(&query.end)?)
         .await?;
     Ok(HttpResponse::Ok().json(data))
 }
@@ -68,7 +82,7 @@ pub async fn top_clients(
 ) -> Result<HttpResponse, AppError> {
     let limit = query.limit.unwrap_or(10).min(50);
     let data = svc
-        .top_clients(&[user.id], query.start, query.end, limit)
+        .top_clients(&[user.id], parse_date(&query.start)?, parse_date(&query.end)?, limit)
         .await?;
     Ok(HttpResponse::Ok().json(data))
 }

@@ -11,12 +11,49 @@ use crate::scheduling::application::service::{
 use crate::shared::error::AppError;
 use crate::shared::types::AuthUser;
 
+// Parse date string: accepts "2026-03-22" or "2026-03-22T18:30:00.000Z"
+fn parse_date_to_utc_start(s: &str) -> Result<DateTime<Utc>, AppError> {
+    // Try ISO datetime first
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    if let Ok(dt) = s.parse::<DateTime<Utc>>() {
+        return Ok(dt);
+    }
+    // Try plain date
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Kolkata
+            .from_local_datetime(&d.and_hms_opt(0, 0, 0).unwrap())
+            .earliest()
+            .map(|dt| dt.with_timezone(&Utc))
+            .ok_or_else(|| AppError::bad_request("Invalid date"));
+    }
+    Err(AppError::bad_request("Invalid date format"))
+}
+
+fn parse_date_to_utc_end(s: &str) -> Result<DateTime<Utc>, AppError> {
+    if let Ok(dt) = DateTime::parse_from_rfc3339(s) {
+        return Ok(dt.with_timezone(&Utc));
+    }
+    if let Ok(dt) = s.parse::<DateTime<Utc>>() {
+        return Ok(dt);
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%Y-%m-%d") {
+        return Kolkata
+            .from_local_datetime(&d.and_hms_opt(23, 59, 59).unwrap())
+            .earliest()
+            .map(|dt| dt.with_timezone(&Utc))
+            .ok_or_else(|| AppError::bad_request("Invalid date"));
+    }
+    Err(AppError::bad_request("Invalid date format"))
+}
+
 // ─── Request DTOs ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
 pub struct DateRangeQuery {
-    pub start: NaiveDate,
-    pub end: NaiveDate,
+    pub start: String,
+    pub end: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -179,17 +216,8 @@ pub async fn list_sessions(
     query: web::Query<DateRangeQuery>,
     session_svc: web::Data<SessionService>,
 ) -> Result<HttpResponse, AppError> {
-    let start_utc = Kolkata
-        .from_local_datetime(&query.start.and_hms_opt(0, 0, 0).unwrap())
-        .earliest()
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok_or_else(|| AppError::bad_request("Invalid start date"))?;
-
-    let end_utc = Kolkata
-        .from_local_datetime(&query.end.and_hms_opt(23, 59, 59).unwrap())
-        .earliest()
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok_or_else(|| AppError::bad_request("Invalid end date"))?;
+    let start_utc = parse_date_to_utc_start(&query.start)?;
+    let end_utc = parse_date_to_utc_end(&query.end)?;
 
     let sessions = session_svc
         .list_by_date_range(user.id, start_utc, end_utc)
@@ -471,17 +499,8 @@ pub async fn list_blocked_slots(
     query: web::Query<DateRangeQuery>,
     blocked_svc: web::Data<BlockedSlotService>,
 ) -> Result<HttpResponse, AppError> {
-    let start_utc = Kolkata
-        .from_local_datetime(&query.start.and_hms_opt(0, 0, 0).unwrap())
-        .earliest()
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok_or_else(|| AppError::bad_request("Invalid start date"))?;
-
-    let end_utc = Kolkata
-        .from_local_datetime(&query.end.and_hms_opt(23, 59, 59).unwrap())
-        .earliest()
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok_or_else(|| AppError::bad_request("Invalid end date"))?;
+    let start_utc = parse_date_to_utc_start(&query.start)?;
+    let end_utc = parse_date_to_utc_end(&query.end)?;
 
     let slots = blocked_svc
         .list_by_range(user.id, start_utc, end_utc)
