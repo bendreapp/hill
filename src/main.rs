@@ -12,7 +12,9 @@ mod analytics;
 use std::sync::Arc;
 use actix_cors::Cors;
 use actix_web::{web, App, HttpServer, HttpResponse, middleware};
+use serde::Deserialize;
 use sqlx::postgres::PgPoolOptions;
+use sqlx::PgPool;
 use tracing_actix_web::TracingLogger;
 
 use crate::shared::auth::JwtKeys;
@@ -76,6 +78,7 @@ async fn main() -> std::io::Result<()> {
     let broadcast_svc = web::Data::new(services.broadcast_service);
     let analytics_svc = web::Data::new(services.analytics_service);
 
+    let db_pool = web::Data::new(pool.clone());
     let app_config = web::Data::new(config.clone());
     let frontend_url = config.frontend_url.clone();
     let host = config.host.clone();
@@ -121,8 +124,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(broadcast_svc.clone())
             // Analytics services
             .app_data(analytics_svc.clone())
-            // Health check
+            // Database pool (for standalone endpoints)
+            .app_data(db_pool.clone())
+            // Health check & public endpoints
             .route("/health", web::get().to(health_check))
+            .route("/api/v1/waitlist", web::post().to(join_waitlist))
             // Feature routes
             .configure(crate::iam::presentation::handlers::configure)
             .configure(crate::scheduling::presentation::handlers::configure)
@@ -144,4 +150,47 @@ async fn health_check() -> HttpResponse {
         "service": "bendre-api",
         "version": env!("CARGO_PKG_VERSION"),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+struct WaitlistInput {
+    email: String,
+    source: Option<String>,
+}
+
+async fn join_waitlist(
+    pool: web::Data<PgPool>,
+    input: web::Json<WaitlistInput>,
+) -> HttpResponse {
+    let email = input.email.trim().to_lowercase();
+    if email.is_empty() || !email.contains('@') {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "Invalid email address"
+        }));
+    }
+
+    let result = sqlx::query_scalar::<_, String>(
+        "INSERT INTO waitlist (email, source) VALUES ($1, $2)
+         ON CONFLICT (email) DO NOTHING
+         RETURNING email"
+    )
+    .bind(&email)
+    .bind(input.source.as_deref().unwrap_or("website"))
+    .fetch_optional(pool.get_ref())
+    .await;
+
+    match result {
+        Ok(Some(_)) => HttpResponse::Created().json(serde_json::json!({
+            "message": "You're on the list!"
+        })),
+        Ok(None) => HttpResponse::Ok().json(serde_json::json!({
+            "message": "You're already on the list!"
+        })),
+        Err(e) => {
+            tracing::error!("Waitlist insert error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Something went wrong. Please try again."
+            }))
+        }
+    }
 }
