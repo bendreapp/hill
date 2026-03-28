@@ -1,0 +1,22 @@
+# Build
+/target
+
+# Environment
+.env
+.env.local
+!.env.example
+
+# SQLx offline cache
+.sqlx/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Misc
+*.log
