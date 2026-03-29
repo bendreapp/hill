@@ -7,6 +7,7 @@ mod clients;
 mod clinical;
 mod billing;
 mod engagement;
+mod admin;
 mod analytics;
 
 use std::sync::Arc;
@@ -81,12 +82,14 @@ async fn main() -> std::io::Result<()> {
     let db_pool = web::Data::new(pool.clone());
     let app_config = web::Data::new(config.clone());
     let frontend_url = config.frontend_url.clone();
+    let hq_frontend_url = config.hq_frontend_url.clone();
     let host = config.host.clone();
     let port = config.port;
 
     HttpServer::new(move || {
         let cors = Cors::default()
             .allowed_origin(&frontend_url)
+            .allowed_origin(&hq_frontend_url)
             .allowed_methods(vec!["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"])
             .allowed_headers(vec!["Authorization", "Content-Type", "Accept"])
             .max_age(3600);
@@ -137,6 +140,8 @@ async fn main() -> std::io::Result<()> {
             .configure(crate::billing::presentation::handlers::configure)
             .configure(crate::engagement::presentation::handlers::configure)
             .configure(crate::analytics::presentation::handlers::configure)
+            // Admin routes
+            .configure(crate::admin::handlers::configure)
     })
     .bind(format!("{}:{}", host, port))?
     .shutdown_timeout(30)

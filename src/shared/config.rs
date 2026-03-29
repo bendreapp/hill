@@ -33,6 +33,10 @@ pub struct AppConfig {
 
     // Frontend URL (for CORS)
     pub frontend_url: String,
+
+    // Admin
+    pub admin_emails: Vec<String>,
+    pub hq_frontend_url: String,
 }
 
 impl AppConfig {
@@ -66,6 +70,15 @@ impl AppConfig {
 
             frontend_url: std::env::var("FRONTEND_URL")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string()),
+
+            admin_emails: std::env::var("ADMIN_EMAILS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect(),
+            hq_frontend_url: std::env::var("HQ_FRONTEND_URL")
+                .unwrap_or_else(|_| "http://localhost:3001".to_string()),
         })
     }
 }
