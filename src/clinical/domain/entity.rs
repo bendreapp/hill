@@ -10,15 +10,21 @@ pub struct SessionNote {
     pub session_id: Uuid,
     pub therapist_id: Uuid,
     pub note_type: String,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub subjective: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub objective: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub assessment: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub plan: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub freeform_content: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub homework: Option<String>,
-    /// Encrypted field — plaintext after decryption in application layer.
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub techniques_used: Option<String>,
-    /// Encrypted field — plaintext after decryption in application layer.
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub risk_flags: Option<String>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
@@ -62,13 +68,16 @@ pub struct TreatmentPlan {
     pub title: String,
     pub modality: String,
     pub modality_other: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub presenting_concerns: Option<String>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub diagnosis: Option<String>,
-    /// Encrypted field — plaintext JSON after decryption in application layer.
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub goals: Option<String>,
     pub status: String,
     pub start_date: Option<NaiveDate>,
     pub target_end_date: Option<NaiveDate>,
+    /// Encrypted — AES-256-GCM, decrypted in application layer.
     pub notes: Option<String>,
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
