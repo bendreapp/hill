@@ -306,6 +306,72 @@ pub async fn signups_by_day(
     Ok(HttpResponse::Ok().json(rows))
 }
 
+#[derive(Serialize, sqlx::FromRow)]
+struct CategoryCount {
+    category: String,
+    count: i64,
+}
+
+#[derive(Serialize, sqlx::FromRow)]
+struct MonthCount {
+    month: String,
+    count: i64,
+}
+
+#[derive(Serialize)]
+struct ClientStats {
+    total: i64,
+    active: i64,
+    inactive: i64,
+    categories: Vec<CategoryCount>,
+    growth_by_month: Vec<MonthCount>,
+}
+
+pub async fn client_stats(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, AppError> {
+    let counts = sqlx::query_as::<_, (i64, i64, i64)>(
+        "SELECT
+            (SELECT COUNT(*) FROM clients WHERE deleted_at IS NULL)::bigint,
+            (SELECT COUNT(*) FROM clients WHERE is_active = true AND deleted_at IS NULL)::bigint,
+            (SELECT COUNT(*) FROM clients WHERE is_active = false AND deleted_at IS NULL)::bigint"
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin client counts error: {}", e);
+        AppError::internal("Failed to fetch client stats")
+    })?;
+
+    let categories = sqlx::query_as::<_, CategoryCount>(
+        "SELECT COALESCE(category::text, 'uncategorized') AS category, COUNT(*)::bigint AS count
+         FROM clients WHERE deleted_at IS NULL
+         GROUP BY category ORDER BY count DESC"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .unwrap_or_default();
+
+    let growth = sqlx::query_as::<_, MonthCount>(
+        "SELECT to_char(created_at, 'YYYY-MM') AS month, COUNT(*)::bigint AS count
+         FROM clients WHERE deleted_at IS NULL AND created_at >= NOW() - INTERVAL '180 days'
+         GROUP BY to_char(created_at, 'YYYY-MM')
+         ORDER BY month"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .unwrap_or_default();
+
+    Ok(HttpResponse::Ok().json(ClientStats {
+        total: counts.0,
+        active: counts.1,
+        inactive: counts.2,
+        categories,
+        growth_by_month: growth,
+    }))
+}
+
 // ─── Route Configuration ────────────────────────────────────────────────────
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
@@ -315,5 +381,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .route("/api/v1/admin/therapists/{id}", web::get().to(therapist_detail))
         .route("/api/v1/admin/waitlist", web::get().to(list_waitlist))
         .route("/api/v1/admin/sessions/recent", web::get().to(recent_sessions))
-        .route("/api/v1/admin/signups-by-day", web::get().to(signups_by_day));
+        .route("/api/v1/admin/signups-by-day", web::get().to(signups_by_day))
+        .route("/api/v1/admin/clients/stats", web::get().to(client_stats));
 }
