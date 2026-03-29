@@ -6,7 +6,7 @@ use super::error::ClientError;
 
 #[async_trait]
 pub trait ClientRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<Client>, ClientError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Client>, ClientError>;
 
     async fn list(
         &self,
@@ -25,12 +25,13 @@ pub trait ClientRepository: Send + Sync {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &super::entity::UpdateClientInput,
     ) -> Result<Client, ClientError>;
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), ClientError>;
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClientError>;
 
-    async fn update_status(&self, id: Uuid, status: &str) -> Result<Client, ClientError>;
+    async fn update_status(&self, id: Uuid, therapist_id: Uuid, status: &str) -> Result<Client, ClientError>;
 
     async fn find_by_email(
         &self,

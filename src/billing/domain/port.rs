@@ -6,7 +6,7 @@ use super::error::BillingError;
 
 #[async_trait]
 pub trait InvoiceRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<Invoice>, BillingError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Invoice>, BillingError>;
 
     async fn list(
         &self,
@@ -30,6 +30,7 @@ pub trait InvoiceRepository: Send + Sync {
     async fn mark_paid(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         razorpay_payment_id: &str,
         razorpay_order_id: Option<&str>,
     ) -> Result<Invoice, BillingError>;

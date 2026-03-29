@@ -18,7 +18,7 @@ impl PgInvoiceRepository {
 
 #[async_trait]
 impl InvoiceRepository for PgInvoiceRepository {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<Invoice>, BillingError> {
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Invoice>, BillingError> {
         sqlx::query_as::<_, Invoice>(
             "SELECT
                 id, therapist_id, client_id, session_id,
@@ -28,9 +28,10 @@ impl InvoiceRepository for PgInvoiceRepository {
                 razorpay_payment_id, razorpay_order_id,
                 paid_at, created_at
             FROM invoices
-            WHERE id = $1"
+            WHERE id = $1 AND therapist_id = $2"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| BillingError::Database(e.to_string()))
@@ -119,6 +120,7 @@ impl InvoiceRepository for PgInvoiceRepository {
     async fn mark_paid(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         razorpay_payment_id: &str,
         razorpay_order_id: Option<&str>,
     ) -> Result<Invoice, BillingError> {
@@ -128,7 +130,7 @@ impl InvoiceRepository for PgInvoiceRepository {
                 razorpay_payment_id = $2,
                 razorpay_order_id = COALESCE($3, razorpay_order_id),
                 paid_at = now()
-            WHERE id = $1
+            WHERE id = $1 AND therapist_id = $4
             RETURNING
                 id, therapist_id, client_id, session_id,
                 invoice_number,
@@ -140,6 +142,7 @@ impl InvoiceRepository for PgInvoiceRepository {
         .bind(id)
         .bind(razorpay_payment_id)
         .bind(razorpay_order_id)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| BillingError::Database(e.to_string()))

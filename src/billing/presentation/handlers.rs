@@ -45,23 +45,23 @@ pub async fn create_invoice(
 }
 
 pub async fn mark_paid(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<PaymentService>,
     id: web::Path<Uuid>,
     body: web::Json<MarkPaidInput>,
 ) -> Result<HttpResponse, AppError> {
     let invoice = svc
-        .mark_paid(*id, &body.razorpay_payment_id, body.razorpay_order_id.as_deref())
+        .mark_paid(*id, user.id, &body.razorpay_payment_id, body.razorpay_order_id.as_deref())
         .await?;
     Ok(HttpResponse::Ok().json(invoice))
 }
 
 pub async fn create_razorpay_order(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<PaymentService>,
     body: web::Json<CreateOrderInput>,
 ) -> Result<HttpResponse, AppError> {
-    let order = svc.create_razorpay_order(body.invoice_id).await?;
+    let order = svc.create_razorpay_order(body.invoice_id, user.id).await?;
     Ok(HttpResponse::Ok().json(order))
 }
 

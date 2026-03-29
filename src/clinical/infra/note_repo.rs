@@ -18,7 +18,7 @@ impl PgNoteRepository {
 
 #[async_trait]
 impl NoteRepository for PgNoteRepository {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
         sqlx::query_as::<_, SessionNote>(
             "SELECT
                 id, session_id, therapist_id,
@@ -28,15 +28,16 @@ impl NoteRepository for PgNoteRepository {
                 techniques_used, risk_flags,
                 deleted_at, created_at, updated_at
             FROM session_notes
-            WHERE id = $1 AND deleted_at IS NULL"
+            WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))
     }
 
-    async fn find_by_session(&self, session_id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
+    async fn find_by_session(&self, session_id: Uuid, therapist_id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
         sqlx::query_as::<_, SessionNote>(
             "SELECT
                 id, session_id, therapist_id,
@@ -46,9 +47,10 @@ impl NoteRepository for PgNoteRepository {
                 techniques_used, risk_flags,
                 deleted_at, created_at, updated_at
             FROM session_notes
-            WHERE session_id = $1 AND deleted_at IS NULL"
+            WHERE session_id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
         )
         .bind(session_id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))
@@ -135,6 +137,7 @@ impl NoteRepository for PgNoteRepository {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateNoteInput,
     ) -> Result<SessionNote, ClinicalError> {
         sqlx::query_as::<_, SessionNote>(
@@ -149,7 +152,7 @@ impl NoteRepository for PgNoteRepository {
                 techniques_used = COALESCE($9, techniques_used),
                 risk_flags = COALESCE($10, risk_flags),
                 updated_at = now()
-            WHERE id = $1 AND deleted_at IS NULL
+            WHERE id = $1 AND therapist_id = $11 AND deleted_at IS NULL
             RETURNING
                 id, session_id, therapist_id,
                 note_type::text as note_type,
@@ -168,14 +171,16 @@ impl NoteRepository for PgNoteRepository {
         .bind(&input.homework)
         .bind(&input.techniques_used)
         .bind(&input.risk_flags)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))
     }
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), ClinicalError> {
-        sqlx::query("UPDATE session_notes SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL")
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError> {
+        sqlx::query("UPDATE session_notes SET deleted_at = now() WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL")
             .bind(id)
+            .bind(therapist_id)
             .execute(&self.pool)
             .await
             .map_err(|e| ClinicalError::Database(e.to_string()))?;

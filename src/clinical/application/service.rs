@@ -23,18 +23,18 @@ impl NoteService {
         }
     }
 
-    pub async fn get_note(&self, id: Uuid) -> Result<SessionNote, ClinicalError> {
+    pub async fn get_note(&self, id: Uuid, therapist_id: Uuid) -> Result<SessionNote, ClinicalError> {
         let mut note = self
             .note_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::NoteNotFound)?;
         self.decrypt_note_fields(&mut note);
         Ok(note)
     }
 
-    pub async fn get_note_by_session(&self, session_id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
-        let mut note = self.note_repo.find_by_session(session_id).await?;
+    pub async fn get_note_by_session(&self, session_id: Uuid, therapist_id: Uuid) -> Result<Option<SessionNote>, ClinicalError> {
+        let mut note = self.note_repo.find_by_session(session_id, therapist_id).await?;
         if let Some(ref mut n) = note {
             self.decrypt_note_fields(n);
         }
@@ -75,10 +75,11 @@ impl NoteService {
     pub async fn update_note(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         mut input: UpdateNoteInput,
     ) -> Result<SessionNote, ClinicalError> {
         self.note_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::NoteNotFound)?;
 
@@ -90,17 +91,17 @@ impl NoteService {
             input.risk_flags = Some(self.encryption.encrypt(val)?);
         }
 
-        let mut note = self.note_repo.update(id, &input).await?;
+        let mut note = self.note_repo.update(id, therapist_id, &input).await?;
         self.decrypt_note_fields(&mut note);
         Ok(note)
     }
 
-    pub async fn delete_note(&self, id: Uuid) -> Result<(), ClinicalError> {
+    pub async fn delete_note(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError> {
         self.note_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::NoteNotFound)?;
-        self.note_repo.soft_delete(id).await
+        self.note_repo.soft_delete(id, therapist_id).await
     }
 
     fn decrypt_note_fields(&self, note: &mut SessionNote) {
@@ -131,10 +132,10 @@ impl TreatmentPlanService {
         }
     }
 
-    pub async fn get_plan(&self, id: Uuid) -> Result<TreatmentPlan, ClinicalError> {
+    pub async fn get_plan(&self, id: Uuid, therapist_id: Uuid) -> Result<TreatmentPlan, ClinicalError> {
         let mut plan = self
             .plan_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::PlanNotFound)?;
         self.decrypt_plan_fields(&mut plan);
@@ -144,10 +145,11 @@ impl TreatmentPlanService {
     pub async fn list_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<TreatmentPlan>, i64), ClinicalError> {
-        let (mut plans, total) = self.plan_repo.list_by_client(client_id, limit, offset).await?;
+        let (mut plans, total) = self.plan_repo.list_by_client(client_id, therapist_id, limit, offset).await?;
         for plan in &mut plans {
             self.decrypt_plan_fields(plan);
         }
@@ -183,27 +185,28 @@ impl TreatmentPlanService {
     pub async fn update_plan(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         mut input: UpdateTreatmentPlanInput,
     ) -> Result<TreatmentPlan, ClinicalError> {
         self.plan_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::PlanNotFound)?;
 
         if let Some(ref val) = input.goals {
             input.goals = Some(self.encryption.encrypt(val)?);
         }
-        let mut plan = self.plan_repo.update(id, &input).await?;
+        let mut plan = self.plan_repo.update(id, therapist_id, &input).await?;
         self.decrypt_plan_fields(&mut plan);
         Ok(plan)
     }
 
-    pub async fn delete_plan(&self, id: Uuid) -> Result<(), ClinicalError> {
+    pub async fn delete_plan(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError> {
         self.plan_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClinicalError::PlanNotFound)?;
-        self.plan_repo.soft_delete(id).await
+        self.plan_repo.soft_delete(id, therapist_id).await
     }
 
     fn decrypt_plan_fields(&self, plan: &mut TreatmentPlan) {
@@ -273,8 +276,8 @@ impl MessageService {
         Ok(msg)
     }
 
-    pub async fn mark_read(&self, message_ids: &[Uuid]) -> Result<(), ClinicalError> {
-        self.message_repo.mark_read(message_ids).await
+    pub async fn mark_read(&self, therapist_id: Uuid, message_ids: &[Uuid]) -> Result<(), ClinicalError> {
+        self.message_repo.mark_read(therapist_id, message_ids).await
     }
 
     pub async fn delete_message(&self, id: Uuid) -> Result<(), ClinicalError> {

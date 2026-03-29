@@ -8,9 +8,9 @@ use super::error::ClinicalError;
 
 #[async_trait]
 pub trait NoteRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<SessionNote>, ClinicalError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<SessionNote>, ClinicalError>;
 
-    async fn find_by_session(&self, session_id: Uuid) -> Result<Option<SessionNote>, ClinicalError>;
+    async fn find_by_session(&self, session_id: Uuid, therapist_id: Uuid) -> Result<Option<SessionNote>, ClinicalError>;
 
     async fn list_by_therapist(
         &self,
@@ -28,21 +28,23 @@ pub trait NoteRepository: Send + Sync {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateNoteInput,
     ) -> Result<SessionNote, ClinicalError>;
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), ClinicalError>;
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError>;
 }
 
 // ─── Treatment Plan Repository ──────────────────────────────────────────────
 
 #[async_trait]
 pub trait TreatmentPlanRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<TreatmentPlan>, ClinicalError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<TreatmentPlan>, ClinicalError>;
 
     async fn list_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<TreatmentPlan>, i64), ClinicalError>;
@@ -63,10 +65,11 @@ pub trait TreatmentPlanRepository: Send + Sync {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateTreatmentPlanInput,
     ) -> Result<TreatmentPlan, ClinicalError>;
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), ClinicalError>;
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError>;
 }
 
 // ─── Message Repository ─────────────────────────────────────────────────────
@@ -94,7 +97,7 @@ pub trait MessageRepository: Send + Sync {
         input: &CreateMessageInput,
     ) -> Result<Message, ClinicalError>;
 
-    async fn mark_read(&self, message_ids: &[Uuid]) -> Result<(), ClinicalError>;
+    async fn mark_read(&self, therapist_id: Uuid, message_ids: &[Uuid]) -> Result<(), ClinicalError>;
 
     async fn soft_delete(&self, id: Uuid) -> Result<(), ClinicalError>;
 }

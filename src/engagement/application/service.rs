@@ -16,9 +16,9 @@ impl ResourceService {
         Self { resource_repo }
     }
 
-    pub async fn get_resource(&self, id: Uuid) -> Result<Resource, EngagementError> {
+    pub async fn get_resource(&self, id: Uuid, therapist_id: Uuid) -> Result<Resource, EngagementError> {
         self.resource_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::ResourceNotFound)
     }
@@ -43,21 +43,22 @@ impl ResourceService {
     pub async fn update_resource(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateResourceInput,
     ) -> Result<Resource, EngagementError> {
         self.resource_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::ResourceNotFound)?;
-        self.resource_repo.update(id, input).await
+        self.resource_repo.update(id, therapist_id, input).await
     }
 
-    pub async fn delete_resource(&self, id: Uuid) -> Result<(), EngagementError> {
+    pub async fn delete_resource(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError> {
         self.resource_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::ResourceNotFound)?;
-        self.resource_repo.soft_delete(id).await
+        self.resource_repo.soft_delete(id, therapist_id).await
     }
 
     pub async fn share_resource(
@@ -68,7 +69,7 @@ impl ResourceService {
         note: Option<&str>,
     ) -> Result<Vec<ClientResource>, EngagementError> {
         self.resource_repo
-            .find_by_id(resource_id)
+            .find_by_id(resource_id, therapist_id)
             .await?
             .ok_or(EngagementError::ResourceNotFound)?;
         self.resource_repo
@@ -79,19 +80,21 @@ impl ResourceService {
     pub async fn unshare_resource(
         &self,
         resource_id: Uuid,
+        therapist_id: Uuid,
         client_ids: &[Uuid],
     ) -> Result<(), EngagementError> {
-        self.resource_repo.unshare(resource_id, client_ids).await
+        self.resource_repo.unshare(resource_id, therapist_id, client_ids).await
     }
 
     pub async fn list_shared_with_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<ClientResource>, i64), EngagementError> {
         self.resource_repo
-            .list_shared_with_client(client_id, limit, offset)
+            .list_shared_with_client(client_id, therapist_id, limit, offset)
             .await
     }
 }
@@ -114,9 +117,9 @@ impl IntakeService {
         }
     }
 
-    pub async fn get_form(&self, id: Uuid) -> Result<IntakeForm, EngagementError> {
+    pub async fn get_form(&self, id: Uuid, therapist_id: Uuid) -> Result<IntakeForm, EngagementError> {
         self.form_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::IntakeFormNotFound)
     }
@@ -141,21 +144,22 @@ impl IntakeService {
     pub async fn update_form(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateIntakeFormInput,
     ) -> Result<IntakeForm, EngagementError> {
         self.form_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::IntakeFormNotFound)?;
-        self.form_repo.update(id, input).await
+        self.form_repo.update(id, therapist_id, input).await
     }
 
-    pub async fn delete_form(&self, id: Uuid) -> Result<(), EngagementError> {
+    pub async fn delete_form(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError> {
         self.form_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::IntakeFormNotFound)?;
-        self.form_repo.delete(id).await
+        self.form_repo.delete(id, therapist_id).await
     }
 
     pub async fn create_response(
@@ -166,7 +170,7 @@ impl IntakeService {
         // Snapshot the form fields at creation time
         let form = self
             .form_repo
-            .find_by_id(input.intake_form_id)
+            .find_by_id(input.intake_form_id, therapist_id)
             .await?
             .ok_or(EngagementError::IntakeFormNotFound)?;
 
@@ -175,10 +179,10 @@ impl IntakeService {
             .await
     }
 
-    pub async fn get_response(&self, id: Uuid) -> Result<IntakeResponse, EngagementError> {
+    pub async fn get_response(&self, id: Uuid, therapist_id: Uuid) -> Result<IntakeResponse, EngagementError> {
         let mut resp = self
             .form_repo
-            .find_response_by_id(id)
+            .find_response_by_id(id, therapist_id)
             .await?
             .ok_or(EngagementError::IntakeResponseNotFound)?;
         self.decrypt_response(&mut resp);
@@ -201,12 +205,13 @@ impl IntakeService {
     pub async fn list_responses_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<IntakeResponse>, i64), EngagementError> {
         let (mut responses, total) = self
             .form_repo
-            .list_responses_by_client(client_id, limit, offset)
+            .list_responses_by_client(client_id, therapist_id, limit, offset)
             .await?;
         for resp in &mut responses {
             self.decrypt_response(resp);
@@ -219,11 +224,9 @@ impl IntakeService {
         id: Uuid,
         input: &SubmitIntakeResponseInput,
     ) -> Result<IntakeResponse, EngagementError> {
-        self.form_repo
-            .find_response_by_id(id)
-            .await?
-            .ok_or(EngagementError::IntakeResponseNotFound)?;
-
+        // Note: submit_response is called from the public (unauthenticated) endpoint.
+        // The repo's submit_response query will fail if the id doesn't exist,
+        // so we don't need a separate existence check with therapist_id here.
         let encrypted = self.encryption.encrypt(&input.responses)?;
         let mut resp = self.form_repo.submit_response(id, &encrypted).await?;
         self.decrypt_response(&mut resp);

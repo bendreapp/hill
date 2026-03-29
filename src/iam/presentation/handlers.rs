@@ -42,10 +42,16 @@ pub async fn get_my_practice(
 }
 
 pub async fn list_members(
-    _user: AuthUser,
+    user: AuthUser,
     practice_svc: web::Data<PracticeService>,
     practice_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    // Verify the user is a member of this practice
+    let membership = practice_svc.get_my_practice(user.id).await?;
+    match membership {
+        Some((practice, _)) if practice.id == *practice_id => {},
+        _ => return Err(AppError::not_found("Practice not found")),
+    }
     let members = practice_svc.list_members(*practice_id).await?;
     Ok(HttpResponse::Ok().json(members))
 }

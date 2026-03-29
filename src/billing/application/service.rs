@@ -21,9 +21,9 @@ impl PaymentService {
         }
     }
 
-    pub async fn get_invoice(&self, id: Uuid) -> Result<Invoice, BillingError> {
+    pub async fn get_invoice(&self, id: Uuid, therapist_id: Uuid) -> Result<Invoice, BillingError> {
         self.invoice_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(BillingError::InvoiceNotFound)
     }
@@ -75,26 +75,28 @@ impl PaymentService {
     pub async fn mark_paid(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         razorpay_payment_id: &str,
         razorpay_order_id: Option<&str>,
     ) -> Result<Invoice, BillingError> {
         self.invoice_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(BillingError::InvoiceNotFound)?;
 
         self.invoice_repo
-            .mark_paid(id, razorpay_payment_id, razorpay_order_id)
+            .mark_paid(id, therapist_id, razorpay_payment_id, razorpay_order_id)
             .await
     }
 
     pub async fn create_razorpay_order(
         &self,
         invoice_id: Uuid,
+        therapist_id: Uuid,
     ) -> Result<PaymentOrder, BillingError> {
         let invoice = self
             .invoice_repo
-            .find_by_id(invoice_id)
+            .find_by_id(invoice_id, therapist_id)
             .await?
             .ok_or(BillingError::InvoiceNotFound)?;
 

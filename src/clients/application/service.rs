@@ -16,9 +16,9 @@ impl ClientService {
         Self { client_repo }
     }
 
-    pub async fn get_client(&self, id: Uuid) -> Result<Client, ClientError> {
+    pub async fn get_client(&self, id: Uuid, therapist_id: Uuid) -> Result<Client, ClientError> {
         self.client_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClientError::ClientNotFound)
     }
@@ -69,37 +69,39 @@ impl ClientService {
     pub async fn update_client(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateClientInput,
     ) -> Result<Client, ClientError> {
-        // Ensure client exists
+        // Ensure client exists and belongs to this therapist
         self.client_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClientError::ClientNotFound)?;
 
-        self.client_repo.update(id, input).await
+        self.client_repo.update(id, therapist_id, input).await
     }
 
-    pub async fn soft_delete_client(&self, id: Uuid) -> Result<(), ClientError> {
+    pub async fn soft_delete_client(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClientError> {
         self.client_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClientError::ClientNotFound)?;
 
-        self.client_repo.soft_delete(id).await
+        self.client_repo.soft_delete(id, therapist_id).await
     }
 
     pub async fn update_status(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         status: &str,
     ) -> Result<Client, ClientError> {
         self.client_repo
-            .find_by_id(id)
+            .find_by_id(id, therapist_id)
             .await?
             .ok_or(ClientError::ClientNotFound)?;
 
-        self.client_repo.update_status(id, status).await
+        self.client_repo.update_status(id, therapist_id, status).await
     }
 
     pub async fn count_active(&self, therapist_id: Uuid) -> Result<i64, ClientError> {
@@ -123,6 +125,19 @@ impl ClientPortalService {
         user_id: Uuid,
     ) -> Result<Vec<ClientPortalProfile>, ClientError> {
         self.portal_repo.list_profiles_by_user(user_id).await
+    }
+
+    /// Verify that the given client_id belongs to the given user_id
+    pub async fn verify_client_ownership(
+        &self,
+        user_id: Uuid,
+        client_id: Uuid,
+    ) -> Result<(), ClientError> {
+        let profiles = self.portal_repo.list_profiles_by_user(user_id).await?;
+        if !profiles.iter().any(|p| p.id == client_id) {
+            return Err(ClientError::ClientNotFound);
+        }
+        Ok(())
     }
 
     pub async fn upcoming_sessions(

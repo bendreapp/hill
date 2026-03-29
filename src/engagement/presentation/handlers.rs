@@ -41,11 +41,11 @@ pub async fn list_resources(
 }
 
 pub async fn get_resource(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ResourceService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let resource = svc.get_resource(*id).await?;
+    let resource = svc.get_resource(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(resource))
 }
 
@@ -59,21 +59,21 @@ pub async fn create_resource(
 }
 
 pub async fn update_resource(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ResourceService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateResourceInput>,
 ) -> Result<HttpResponse, AppError> {
-    let resource = svc.update_resource(*id, &body).await?;
+    let resource = svc.update_resource(*id, user.id, &body).await?;
     Ok(HttpResponse::Ok().json(resource))
 }
 
 pub async fn delete_resource(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ResourceService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    svc.delete_resource(*id).await?;
+    svc.delete_resource(*id, user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -90,17 +90,17 @@ pub async fn share_resource(
 }
 
 pub async fn unshare_resource(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ResourceService>,
     id: web::Path<Uuid>,
     body: web::Json<UnshareResourceInput>,
 ) -> Result<HttpResponse, AppError> {
-    svc.unshare_resource(*id, &body.client_ids).await?;
+    svc.unshare_resource(*id, user.id, &body.client_ids).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn list_client_resources(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ResourceService>,
     client_id: web::Path<Uuid>,
     query: web::Query<PaginationQuery>,
@@ -110,7 +110,7 @@ pub async fn list_client_resources(
     let offset = (page - 1) * per_page;
 
     let (data, total) = svc
-        .list_shared_with_client(*client_id, per_page, offset)
+        .list_shared_with_client(*client_id, user.id, per_page, offset)
         .await?;
 
     Ok(HttpResponse::Ok().json(Paginated {
@@ -143,11 +143,11 @@ pub async fn list_intake_forms(
 }
 
 pub async fn get_intake_form(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<IntakeService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let form = svc.get_form(*id).await?;
+    let form = svc.get_form(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(form))
 }
 
@@ -161,21 +161,21 @@ pub async fn create_intake_form(
 }
 
 pub async fn update_intake_form(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<IntakeService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateIntakeFormInput>,
 ) -> Result<HttpResponse, AppError> {
-    let form = svc.update_form(*id, &body).await?;
+    let form = svc.update_form(*id, user.id, &body).await?;
     Ok(HttpResponse::Ok().json(form))
 }
 
 pub async fn delete_intake_form(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<IntakeService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    svc.delete_form(*id).await?;
+    svc.delete_form(*id, user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -191,11 +191,11 @@ pub async fn create_intake_response(
 }
 
 pub async fn get_intake_response(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<IntakeService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let resp = svc.get_response(*id).await?;
+    let resp = svc.get_response(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(resp))
 }
 
@@ -208,7 +208,7 @@ pub async fn get_intake_response_by_token(
 }
 
 pub async fn list_client_intake_responses(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<IntakeService>,
     client_id: web::Path<Uuid>,
     query: web::Query<PaginationQuery>,
@@ -218,7 +218,7 @@ pub async fn list_client_intake_responses(
     let offset = (page - 1) * per_page;
 
     let (data, total) = svc
-        .list_responses_by_client(*client_id, per_page, offset)
+        .list_responses_by_client(*client_id, user.id, per_page, offset)
         .await?;
 
     Ok(HttpResponse::Ok().json(Paginated {

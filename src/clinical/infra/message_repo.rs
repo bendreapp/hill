@@ -114,12 +114,13 @@ impl MessageRepository for PgMessageRepository {
         .map_err(|e| ClinicalError::Database(e.to_string()))
     }
 
-    async fn mark_read(&self, message_ids: &[Uuid]) -> Result<(), ClinicalError> {
+    async fn mark_read(&self, therapist_id: Uuid, message_ids: &[Uuid]) -> Result<(), ClinicalError> {
         sqlx::query(
             "UPDATE messages SET read_at = now()
-            WHERE id = ANY($1) AND read_at IS NULL AND deleted_at IS NULL"
+            WHERE id = ANY($1) AND therapist_id = $2 AND read_at IS NULL AND deleted_at IS NULL"
         )
         .bind(message_ids)
+        .bind(therapist_id)
         .execute(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))?;

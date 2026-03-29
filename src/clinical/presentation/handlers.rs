@@ -47,20 +47,20 @@ pub async fn list_notes(
 }
 
 pub async fn get_note(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<NoteService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let note = svc.get_note(*id).await?;
+    let note = svc.get_note(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 
 pub async fn get_note_by_session(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<NoteService>,
     session_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let note = svc.get_note_by_session(*session_id).await?;
+    let note = svc.get_note_by_session(*session_id, user.id).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 
@@ -74,21 +74,21 @@ pub async fn create_note(
 }
 
 pub async fn update_note(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<NoteService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateNoteInput>,
 ) -> Result<HttpResponse, AppError> {
-    let note = svc.update_note(*id, body.into_inner()).await?;
+    let note = svc.update_note(*id, user.id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(note))
 }
 
 pub async fn delete_note(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<NoteService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    svc.delete_note(*id).await?;
+    svc.delete_note(*id, user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -114,7 +114,7 @@ pub async fn list_plans(
 }
 
 pub async fn list_plans_by_client(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<TreatmentPlanService>,
     client_id: web::Path<Uuid>,
     query: web::Query<PaginationQuery>,
@@ -123,7 +123,7 @@ pub async fn list_plans_by_client(
     let per_page = query.per_page.unwrap_or(20).min(100);
     let offset = (page - 1) * per_page;
 
-    let (data, total) = svc.list_by_client(*client_id, per_page, offset).await?;
+    let (data, total) = svc.list_by_client(*client_id, user.id, per_page, offset).await?;
 
     Ok(HttpResponse::Ok().json(Paginated {
         data,
@@ -134,11 +134,11 @@ pub async fn list_plans_by_client(
 }
 
 pub async fn get_plan(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<TreatmentPlanService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let plan = svc.get_plan(*id).await?;
+    let plan = svc.get_plan(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(plan))
 }
 
@@ -152,21 +152,21 @@ pub async fn create_plan(
 }
 
 pub async fn update_plan(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<TreatmentPlanService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateTreatmentPlanInput>,
 ) -> Result<HttpResponse, AppError> {
-    let plan = svc.update_plan(*id, body.into_inner()).await?;
+    let plan = svc.update_plan(*id, user.id, body.into_inner()).await?;
     Ok(HttpResponse::Ok().json(plan))
 }
 
 pub async fn delete_plan(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<TreatmentPlanService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    svc.delete_plan(*id).await?;
+    svc.delete_plan(*id, user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
@@ -203,11 +203,11 @@ pub async fn send_message(
 }
 
 pub async fn mark_read(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<MessageService>,
     body: web::Json<MarkReadInput>,
 ) -> Result<HttpResponse, AppError> {
-    svc.mark_read(&body.message_ids).await?;
+    svc.mark_read(user.id, &body.message_ids).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 

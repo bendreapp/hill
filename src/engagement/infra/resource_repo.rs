@@ -20,7 +20,7 @@ impl PgResourceRepository {
 
 #[async_trait]
 impl ResourceRepository for PgResourceRepository {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<Resource>, EngagementError> {
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Resource>, EngagementError> {
         sqlx::query_as::<_, Resource>(
             "SELECT
                 id, therapist_id, title, description,
@@ -29,9 +29,10 @@ impl ResourceRepository for PgResourceRepository {
                 modality_tags, category_tags,
                 deleted_at, created_at, updated_at
             FROM resources
-            WHERE id = $1 AND deleted_at IS NULL"
+            WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))
@@ -111,6 +112,7 @@ impl ResourceRepository for PgResourceRepository {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateResourceInput,
     ) -> Result<Resource, EngagementError> {
         sqlx::query_as::<_, Resource>(
@@ -123,7 +125,7 @@ impl ResourceRepository for PgResourceRepository {
                 modality_tags = COALESCE($7, modality_tags),
                 category_tags = COALESCE($8, category_tags),
                 updated_at = now()
-            WHERE id = $1 AND deleted_at IS NULL
+            WHERE id = $1 AND therapist_id = $9 AND deleted_at IS NULL
             RETURNING
                 id, therapist_id, title, description,
                 resource_type::text as resource_type,
@@ -139,14 +141,16 @@ impl ResourceRepository for PgResourceRepository {
         .bind(&input.external_url)
         .bind(input.modality_tags.as_deref())
         .bind(input.category_tags.as_deref())
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))
     }
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), EngagementError> {
-        sqlx::query("UPDATE resources SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL")
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError> {
+        sqlx::query("UPDATE resources SET deleted_at = now() WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL")
             .bind(id)
+            .bind(therapist_id)
             .execute(&self.pool)
             .await
             .map_err(|e| EngagementError::Database(e.to_string()))?;
@@ -187,10 +191,12 @@ impl ResourceRepository for PgResourceRepository {
     async fn unshare(
         &self,
         resource_id: Uuid,
+        therapist_id: Uuid,
         client_ids: &[Uuid],
     ) -> Result<(), EngagementError> {
-        sqlx::query("DELETE FROM client_resources WHERE resource_id = $1 AND client_id = ANY($2)")
+        sqlx::query("DELETE FROM client_resources WHERE resource_id = $1 AND therapist_id = $2 AND client_id = ANY($3)")
             .bind(resource_id)
+            .bind(therapist_id)
             .bind(client_ids)
             .execute(&self.pool)
             .await
@@ -202,17 +208,19 @@ impl ResourceRepository for PgResourceRepository {
     async fn list_shared_with_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<ClientResource>, i64), EngagementError> {
         let rows = sqlx::query_as::<_, ClientResource>(
             "SELECT id, resource_id, client_id, therapist_id, shared_at, note
             FROM client_resources
-            WHERE client_id = $1
+            WHERE client_id = $1 AND therapist_id = $2
             ORDER BY shared_at DESC
-            LIMIT $2 OFFSET $3"
+            LIMIT $3 OFFSET $4"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -220,9 +228,10 @@ impl ResourceRepository for PgResourceRepository {
         .map_err(|e| EngagementError::Database(e.to_string()))?;
 
         let total = sqlx::query_scalar::<_, i64>(
-            "SELECT count(*) FROM client_resources WHERE client_id = $1"
+            "SELECT count(*) FROM client_resources WHERE client_id = $1 AND therapist_id = $2"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))?;

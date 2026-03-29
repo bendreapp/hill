@@ -8,7 +8,7 @@ use super::error::EngagementError;
 
 #[async_trait]
 pub trait ResourceRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<Resource>, EngagementError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Resource>, EngagementError>;
 
     async fn list(
         &self,
@@ -26,10 +26,11 @@ pub trait ResourceRepository: Send + Sync {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateResourceInput,
     ) -> Result<Resource, EngagementError>;
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), EngagementError>;
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError>;
 
     async fn share(
         &self,
@@ -42,12 +43,14 @@ pub trait ResourceRepository: Send + Sync {
     async fn unshare(
         &self,
         resource_id: Uuid,
+        therapist_id: Uuid,
         client_ids: &[Uuid],
     ) -> Result<(), EngagementError>;
 
     async fn list_shared_with_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<ClientResource>, i64), EngagementError>;
@@ -57,7 +60,7 @@ pub trait ResourceRepository: Send + Sync {
 
 #[async_trait]
 pub trait IntakeFormRepository: Send + Sync {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<IntakeForm>, EngagementError>;
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<IntakeForm>, EngagementError>;
 
     async fn list(
         &self,
@@ -75,10 +78,11 @@ pub trait IntakeFormRepository: Send + Sync {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateIntakeFormInput,
     ) -> Result<IntakeForm, EngagementError>;
 
-    async fn delete(&self, id: Uuid) -> Result<(), EngagementError>;
+    async fn delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError>;
 
     // ─── Responses ──────────────────────────────────────────────────────
 
@@ -89,7 +93,7 @@ pub trait IntakeFormRepository: Send + Sync {
         form_snapshot: &serde_json::Value,
     ) -> Result<IntakeResponse, EngagementError>;
 
-    async fn find_response_by_id(&self, id: Uuid) -> Result<Option<IntakeResponse>, EngagementError>;
+    async fn find_response_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<IntakeResponse>, EngagementError>;
 
     async fn find_response_by_token(
         &self,
@@ -99,6 +103,7 @@ pub trait IntakeFormRepository: Send + Sync {
     async fn list_responses_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<IntakeResponse>, i64), EngagementError>;

@@ -21,7 +21,7 @@ impl PgIntakeFormRepository {
 
 #[async_trait]
 impl IntakeFormRepository for PgIntakeFormRepository {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<IntakeForm>, EngagementError> {
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<IntakeForm>, EngagementError> {
         sqlx::query_as::<_, IntakeForm>(
             "SELECT
                 id, therapist_id, name, description,
@@ -30,9 +30,10 @@ impl IntakeFormRepository for PgIntakeFormRepository {
                 fields,
                 created_at, updated_at
             FROM intake_forms
-            WHERE id = $1"
+            WHERE id = $1 AND therapist_id = $2"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))
@@ -112,6 +113,7 @@ impl IntakeFormRepository for PgIntakeFormRepository {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateIntakeFormInput,
     ) -> Result<IntakeForm, EngagementError> {
         sqlx::query_as::<_, IntakeForm>(
@@ -122,7 +124,7 @@ impl IntakeFormRepository for PgIntakeFormRepository {
                 status = COALESCE($5::intake_form_status, status),
                 fields = COALESCE($6, fields),
                 updated_at = now()
-            WHERE id = $1
+            WHERE id = $1 AND therapist_id = $7
             RETURNING
                 id, therapist_id, name, description,
                 form_type,
@@ -136,14 +138,16 @@ impl IntakeFormRepository for PgIntakeFormRepository {
         .bind(&input.form_type)
         .bind(&input.status)
         .bind(&input.fields)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))
     }
 
-    async fn delete(&self, id: Uuid) -> Result<(), EngagementError> {
-        sqlx::query("DELETE FROM intake_forms WHERE id = $1")
+    async fn delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), EngagementError> {
+        sqlx::query("DELETE FROM intake_forms WHERE id = $1 AND therapist_id = $2")
             .bind(id)
+            .bind(therapist_id)
             .execute(&self.pool)
             .await
             .map_err(|e| EngagementError::Database(e.to_string()))?;
@@ -185,6 +189,7 @@ impl IntakeFormRepository for PgIntakeFormRepository {
     async fn find_response_by_id(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
     ) -> Result<Option<IntakeResponse>, EngagementError> {
         sqlx::query_as::<_, IntakeResponse>(
             "SELECT
@@ -195,9 +200,10 @@ impl IntakeFormRepository for PgIntakeFormRepository {
                 submitted_at, expires_at,
                 created_at, updated_at
             FROM intake_responses
-            WHERE id = $1"
+            WHERE id = $1 AND therapist_id = $2"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))
@@ -227,6 +233,7 @@ impl IntakeFormRepository for PgIntakeFormRepository {
     async fn list_responses_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<IntakeResponse>, i64), EngagementError> {
@@ -239,11 +246,12 @@ impl IntakeFormRepository for PgIntakeFormRepository {
                 submitted_at, expires_at,
                 created_at, updated_at
             FROM intake_responses
-            WHERE client_id = $1
+            WHERE client_id = $1 AND therapist_id = $2
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3"
+            LIMIT $3 OFFSET $4"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -251,9 +259,10 @@ impl IntakeFormRepository for PgIntakeFormRepository {
         .map_err(|e| EngagementError::Database(e.to_string()))?;
 
         let total = sqlx::query_scalar::<_, i64>(
-            "SELECT count(*) FROM intake_responses WHERE client_id = $1"
+            "SELECT count(*) FROM intake_responses WHERE client_id = $1 AND therapist_id = $2"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| EngagementError::Database(e.to_string()))?;

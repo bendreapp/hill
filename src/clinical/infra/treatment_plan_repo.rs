@@ -20,7 +20,7 @@ impl PgTreatmentPlanRepository {
 
 #[async_trait]
 impl TreatmentPlanRepository for PgTreatmentPlanRepository {
-    async fn find_by_id(&self, id: Uuid) -> Result<Option<TreatmentPlan>, ClinicalError> {
+    async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<TreatmentPlan>, ClinicalError> {
         sqlx::query_as::<_, TreatmentPlan>(
             "SELECT
                 id, therapist_id, client_id, title,
@@ -31,9 +31,10 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
                 start_date, target_end_date, notes,
                 deleted_at, created_at, updated_at
             FROM treatment_plans
-            WHERE id = $1 AND deleted_at IS NULL"
+            WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
         )
         .bind(id)
+        .bind(therapist_id)
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))
@@ -42,6 +43,7 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
     async fn list_by_client(
         &self,
         client_id: Uuid,
+        therapist_id: Uuid,
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<TreatmentPlan>, i64), ClinicalError> {
@@ -55,11 +57,12 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
                 start_date, target_end_date, notes,
                 deleted_at, created_at, updated_at
             FROM treatment_plans
-            WHERE client_id = $1 AND deleted_at IS NULL
+            WHERE client_id = $1 AND therapist_id = $2 AND deleted_at IS NULL
             ORDER BY created_at DESC
-            LIMIT $2 OFFSET $3"
+            LIMIT $3 OFFSET $4"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -69,9 +72,10 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
         let total = sqlx::query_scalar::<_, i64>(
             "SELECT count(*)
             FROM treatment_plans
-            WHERE client_id = $1 AND deleted_at IS NULL"
+            WHERE client_id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
         )
         .bind(client_id)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))?;
@@ -168,6 +172,7 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
     async fn update(
         &self,
         id: Uuid,
+        therapist_id: Uuid,
         input: &UpdateTreatmentPlanInput,
     ) -> Result<TreatmentPlan, ClinicalError> {
         sqlx::query_as::<_, TreatmentPlan>(
@@ -183,7 +188,7 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
                 target_end_date = COALESCE($10, target_end_date),
                 notes = COALESCE($11, notes),
                 updated_at = now()
-            WHERE id = $1 AND deleted_at IS NULL
+            WHERE id = $1 AND therapist_id = $12 AND deleted_at IS NULL
             RETURNING
                 id, therapist_id, client_id, title,
                 modality::text as modality,
@@ -204,14 +209,16 @@ impl TreatmentPlanRepository for PgTreatmentPlanRepository {
         .bind(&input.start_date)
         .bind(&input.target_end_date)
         .bind(&input.notes)
+        .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| ClinicalError::Database(e.to_string()))
     }
 
-    async fn soft_delete(&self, id: Uuid) -> Result<(), ClinicalError> {
-        sqlx::query("UPDATE treatment_plans SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL")
+    async fn soft_delete(&self, id: Uuid, therapist_id: Uuid) -> Result<(), ClinicalError> {
+        sqlx::query("UPDATE treatment_plans SET deleted_at = now() WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL")
             .bind(id)
+            .bind(therapist_id)
             .execute(&self.pool)
             .await
             .map_err(|e| ClinicalError::Database(e.to_string()))?;

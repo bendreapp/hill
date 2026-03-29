@@ -52,11 +52,11 @@ pub async fn list_clients(
 }
 
 pub async fn get_client(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    let client = svc.get_client(*id).await?;
+    let client = svc.get_client(*id, user.id).await?;
     Ok(HttpResponse::Ok().json(client))
 }
 
@@ -71,31 +71,31 @@ pub async fn create_client(
 }
 
 pub async fn update_client(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateClientInput>,
 ) -> Result<HttpResponse, AppError> {
-    let client = svc.update_client(*id, &body).await?;
+    let client = svc.update_client(*id, user.id, &body).await?;
     Ok(HttpResponse::Ok().json(client))
 }
 
 pub async fn delete_client(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientService>,
     id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
-    svc.soft_delete_client(*id).await?;
+    svc.soft_delete_client(*id, user.id).await?;
     Ok(HttpResponse::NoContent().finish())
 }
 
 pub async fn update_client_status(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientService>,
     id: web::Path<Uuid>,
     body: web::Json<UpdateStatusInput>,
 ) -> Result<HttpResponse, AppError> {
-    let client = svc.update_status(*id, &body.status).await?;
+    let client = svc.update_status(*id, user.id, &body.status).await?;
     Ok(HttpResponse::Ok().json(client))
 }
 
@@ -118,22 +118,24 @@ pub async fn portal_list_profiles(
 }
 
 pub async fn portal_upcoming_sessions(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientPortalService>,
     client_id: web::Path<Uuid>,
     query: web::Query<PortalSessionQuery>,
 ) -> Result<HttpResponse, AppError> {
+    svc.verify_client_ownership(user.id, *client_id).await?;
     let limit = query.limit.unwrap_or(10).min(50);
     let sessions = svc.upcoming_sessions(*client_id, limit).await?;
     Ok(HttpResponse::Ok().json(sessions))
 }
 
 pub async fn portal_past_sessions(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientPortalService>,
     client_id: web::Path<Uuid>,
     query: web::Query<PortalSessionQuery>,
 ) -> Result<HttpResponse, AppError> {
+    svc.verify_client_ownership(user.id, *client_id).await?;
     let page = query.page.unwrap_or(1).max(1);
     let per_page = query.per_page.unwrap_or(20).min(100);
     let offset = (page - 1) * per_page;
@@ -162,10 +164,11 @@ pub async fn portal_get_profile(
 }
 
 pub async fn portal_upcoming_count(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<ClientPortalService>,
     client_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    svc.verify_client_ownership(user.id, *client_id).await?;
     let sessions = svc.upcoming_sessions(*client_id, 100).await?;
     Ok(HttpResponse::Ok().json(serde_json::json!({ "count": sessions.len() })))
 }
@@ -174,6 +177,7 @@ pub async fn portal_invoices(
     _user: AuthUser,
     _client_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    // TODO: verify client ownership once billing is wired up
     // Returns invoices for a client in the portal; delegates to billing feature via HTTP.
     // Kept as a thin pass-through to avoid cross-feature imports.
     Ok(HttpResponse::Ok().json(serde_json::json!({ "data": [], "total": 0 })))
@@ -183,6 +187,7 @@ pub async fn portal_resources(
     _user: AuthUser,
     _client_id: web::Path<Uuid>,
 ) -> Result<HttpResponse, AppError> {
+    // TODO: verify client ownership once engagement is wired up
     // Returns shared resources for a client in the portal; delegates to engagement feature via HTTP.
     // Kept as a thin pass-through to avoid cross-feature imports.
     Ok(HttpResponse::Ok().json(serde_json::json!({ "data": [], "total": 0 })))
