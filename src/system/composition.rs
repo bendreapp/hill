@@ -50,6 +50,11 @@ use crate::engagement::infra::encryption_adapter::EngagementEncryptionAdapter;
 use crate::analytics::application::service::AnalyticsService;
 use crate::analytics::infra::analytics_repo::PgAnalyticsRepository;
 
+// ─── Leads ──────────────────────────────────────────────────────────────────
+use crate::leads::application::service::{LeadService, ClientInvitationService};
+use crate::leads::infra::lead_repo::PgLeadRepository;
+use crate::leads::infra::invitation_repo::PgClientInvitationRepository;
+
 /// All wired services, ready to be injected into Actix `app_data`.
 pub struct AppServices {
     // IAM
@@ -83,6 +88,10 @@ pub struct AppServices {
 
     // Analytics
     pub analytics_service: AnalyticsService,
+
+    // Leads
+    pub lead_service: LeadService,
+    pub client_invitation_service: ClientInvitationService,
 }
 
 impl AppServices {
@@ -177,6 +186,13 @@ impl AppServices {
         let analytics_repo = Arc::new(PgAnalyticsRepository::new(pool.clone()));
         let analytics_service = AnalyticsService::new(analytics_repo);
 
+        // ── Leads ──────────────────────────────────────────────────────
+        let lead_repo = Arc::new(PgLeadRepository::new(pool.clone()));
+        let client_invitation_repo = Arc::new(PgClientInvitationRepository::new(pool.clone()));
+
+        let lead_service = LeadService::new(lead_repo);
+        let client_invitation_service = ClientInvitationService::new(client_invitation_repo);
+
         Self {
             therapist_service,
             practice_service,
@@ -196,6 +212,8 @@ impl AppServices {
             intake_service,
             broadcast_service,
             analytics_service,
+            lead_service,
+            client_invitation_service,
         }
     }
 }

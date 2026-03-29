@@ -9,6 +9,7 @@ mod billing;
 mod engagement;
 mod admin;
 mod analytics;
+mod leads;
 
 use std::sync::Arc;
 use actix_cors::Cors;
@@ -78,6 +79,8 @@ async fn main() -> std::io::Result<()> {
     let intake_svc = web::Data::new(services.intake_service);
     let broadcast_svc = web::Data::new(services.broadcast_service);
     let analytics_svc = web::Data::new(services.analytics_service);
+    let lead_svc = web::Data::new(services.lead_service);
+    let client_invitation_svc = web::Data::new(services.client_invitation_service);
 
     let db_pool = web::Data::new(pool.clone());
     let app_config = web::Data::new(config.clone());
@@ -127,6 +130,9 @@ async fn main() -> std::io::Result<()> {
             .app_data(broadcast_svc.clone())
             // Analytics services
             .app_data(analytics_svc.clone())
+            // Leads services
+            .app_data(lead_svc.clone())
+            .app_data(client_invitation_svc.clone())
             // Database pool (for standalone endpoints)
             .app_data(db_pool.clone())
             // Health check & public endpoints
@@ -140,6 +146,8 @@ async fn main() -> std::io::Result<()> {
             .configure(crate::billing::presentation::handlers::configure)
             .configure(crate::engagement::presentation::handlers::configure)
             .configure(crate::analytics::presentation::handlers::configure)
+            // Leads & invitations
+            .configure(crate::leads::presentation::handlers::configure)
             // Admin routes
             .configure(crate::admin::handlers::configure)
     })
