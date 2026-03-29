@@ -4,6 +4,9 @@ use chrono_tz::Asia::Kolkata;
 use serde::Deserialize;
 use uuid::Uuid;
 
+use crate::clients::application::service::ClientService;
+use crate::clients::domain::entity::CreateClientInput;
+use crate::iam::application::service::TherapistService;
 use crate::scheduling::application::service::{
     BlockedSlotService, BookingService, DayAvailability, RecurringReservationService,
     SessionService, SessionTypeService,
@@ -129,20 +132,26 @@ pub struct DayAvailabilityInput {
 
 #[derive(Debug, Deserialize)]
 pub struct BookSessionInput {
-    pub client_id: Uuid,
+    pub client_name: String,
+    pub client_email: String,
+    pub client_phone: Option<String>,
     pub starts_at: DateTime<Utc>,
     pub ends_at: DateTime<Utc>,
-    pub amount_inr: i32,
+    pub amount_inr: Option<i32>,
     pub session_type_name: Option<String>,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct BookMultipleInput {
-    pub client_id: Uuid,
+    pub client_name: String,
+    pub client_email: String,
+    pub client_phone: Option<String>,
     pub slots: Vec<SlotInput>,
-    pub amount_inr: i32,
+    pub amount_inr: Option<i32>,
     pub session_type_name: Option<String>,
     pub recurring_reservation_id: Option<Uuid>,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -416,13 +425,16 @@ pub async fn delete_session(
 
 // ─── Booking Handlers ───────────────────────────────────────────────────────
 
-/// GET /api/v1/booking/{therapist_id}/available-slots?date=YYYY-MM-DD&duration_mins=50
+/// POST /api/v1/booking/{slug}/available-slots?date=YYYY-MM-DD&duration_mins=50
 pub async fn get_available_slots(
-    therapist_id: web::Path<Uuid>,
+    slug: web::Path<String>,
     query: web::Query<AvailableSlotsQuery>,
     input: web::Json<AvailabilityInput>,
     booking_svc: web::Data<BookingService>,
+    therapist_svc: web::Data<TherapistService>,
 ) -> Result<HttpResponse, AppError> {
+    let therapist = therapist_svc.get_by_slug(&slug).await?;
+
     let availability: Vec<DayAvailability> = input
         .availability
         .iter()
@@ -436,7 +448,7 @@ pub async fn get_available_slots(
 
     let slots = booking_svc
         .get_available_slots(
-            *therapist_id,
+            therapist.id,
             query.date,
             query.duration_mins,
             query.buffer_mins.unwrap_or(10),
@@ -447,43 +459,115 @@ pub async fn get_available_slots(
     Ok(HttpResponse::Ok().json(slots))
 }
 
-/// POST /api/v1/booking/{therapist_id}/book
+/// POST /api/v1/booking/{slug}/book
 pub async fn book_session(
-    therapist_id: web::Path<Uuid>,
+    slug: web::Path<String>,
     input: web::Json<BookSessionInput>,
     booking_svc: web::Data<BookingService>,
+    therapist_svc: web::Data<TherapistService>,
+    client_svc: web::Data<ClientService>,
 ) -> Result<HttpResponse, AppError> {
+    let therapist = therapist_svc.get_by_slug(&slug).await?;
+
+    // Look up existing client by email, or create a new one
+    let client = client_svc
+        .client_repo
+        .find_by_email(therapist.id, &input.client_email)
+        .await
+        .map_err(AppError::from)?;
+
+    let client_id = match client {
+        Some(c) => c.id,
+        None => {
+            let new_client = client_svc
+                .create_client(
+                    therapist.id,
+                    &CreateClientInput {
+                        full_name: input.client_name.clone(),
+                        email: Some(input.client_email.clone()),
+                        phone: input.client_phone.clone(),
+                        date_of_birth: None,
+                        emergency_contact: None,
+                        notes_private: input.reason.clone(),
+                        client_type: None,
+                        category: None,
+                    },
+                    None, // no plan limit check for public bookings
+                )
+                .await
+                .map_err(AppError::from)?;
+            new_client.id
+        }
+    };
+
+    let amount = input.amount_inr.unwrap_or(0);
     let session = booking_svc
         .book(
-            *therapist_id,
-            input.client_id,
+            therapist.id,
+            client_id,
             input.starts_at,
             input.ends_at,
-            input.amount_inr,
+            amount,
             input.session_type_name.clone(),
         )
         .await?;
     Ok(HttpResponse::Created().json(session))
 }
 
-/// POST /api/v1/booking/{therapist_id}/book-multiple
+/// POST /api/v1/booking/{slug}/book-multiple
 pub async fn book_multiple_sessions(
-    therapist_id: web::Path<Uuid>,
+    slug: web::Path<String>,
     input: web::Json<BookMultipleInput>,
     booking_svc: web::Data<BookingService>,
+    therapist_svc: web::Data<TherapistService>,
+    client_svc: web::Data<ClientService>,
 ) -> Result<HttpResponse, AppError> {
+    let therapist = therapist_svc.get_by_slug(&slug).await?;
+
+    // Look up existing client by email, or create a new one
+    let client = client_svc
+        .client_repo
+        .find_by_email(therapist.id, &input.client_email)
+        .await
+        .map_err(AppError::from)?;
+
+    let client_id = match client {
+        Some(c) => c.id,
+        None => {
+            let new_client = client_svc
+                .create_client(
+                    therapist.id,
+                    &CreateClientInput {
+                        full_name: input.client_name.clone(),
+                        email: Some(input.client_email.clone()),
+                        phone: input.client_phone.clone(),
+                        date_of_birth: None,
+                        emergency_contact: None,
+                        notes_private: input.reason.clone(),
+                        client_type: None,
+                        category: None,
+                    },
+                    None,
+                )
+                .await
+                .map_err(AppError::from)?;
+            new_client.id
+        }
+    };
+
     let slots: Vec<(DateTime<Utc>, DateTime<Utc>)> = input
         .slots
         .iter()
         .map(|s| (s.starts_at, s.ends_at))
         .collect();
 
+    let amount = input.amount_inr.unwrap_or(0);
     let sessions = booking_svc
         .book_multiple(
-            *therapist_id,
-            input.client_id,
+            therapist.id,
+            client_id,
             slots,
-            input.amount_inr,
+            amount,
             input.session_type_name.clone(),
             input.recurring_reservation_id,
         )
@@ -792,17 +876,17 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
                 "/api/v1/sessions/{id}/reschedule",
                 web::post().to(reschedule_session),
             )
-            // Booking (public-ish, therapist_id in path)
+            // Booking (public, slug in path)
             .route(
-                "/api/v1/booking/{therapist_id}/available-slots",
+                "/api/v1/booking/{slug}/available-slots",
                 web::post().to(get_available_slots),
             )
             .route(
-                "/api/v1/booking/{therapist_id}/book",
+                "/api/v1/booking/{slug}/book",
                 web::post().to(book_session),
             )
             .route(
-                "/api/v1/booking/{therapist_id}/book-multiple",
+                "/api/v1/booking/{slug}/book-multiple",
                 web::post().to(book_multiple_sessions),
             )
             // Blocked slots
