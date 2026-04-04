@@ -30,6 +30,10 @@ impl TherapistRepository for PgTherapistRepository {
                 no_show_charge_percent, late_cancel_charge_percent,
                 cancellation_policy, late_policy, rescheduling_policy,
                 custom_tags, practice_id,
+                whatsapp_number, team_size,
+                comms_whatsapp, comms_email, comms_sms,
+                plan_selected, plan_status,
+                support_requested, onboarding_complete, avatar_key,
                 created_at, updated_at
             FROM therapists
             WHERE id = $1"
@@ -52,6 +56,10 @@ impl TherapistRepository for PgTherapistRepository {
                 no_show_charge_percent, late_cancel_charge_percent,
                 cancellation_policy, late_policy, rescheduling_policy,
                 custom_tags, practice_id,
+                whatsapp_number, team_size,
+                comms_whatsapp, comms_email, comms_sms,
+                plan_selected, plan_status,
+                support_requested, onboarding_complete, avatar_key,
                 created_at, updated_at
             FROM therapists
             WHERE slug = $1 AND booking_page_active = true"
@@ -73,6 +81,10 @@ impl TherapistRepository for PgTherapistRepository {
                 no_show_charge_percent = $18, late_cancel_charge_percent = $19,
                 cancellation_policy = $20, late_policy = $21, rescheduling_policy = $22,
                 custom_tags = $23, zoom_connected = $24, google_connected = $25,
+                whatsapp_number = $26, team_size = $27,
+                comms_whatsapp = $28, comms_email = $29, comms_sms = $30,
+                plan_selected = $31, plan_status = $32,
+                support_requested = $33, onboarding_complete = $34, avatar_key = $35,
                 updated_at = now()
             WHERE id = $1
             RETURNING
@@ -85,6 +97,10 @@ impl TherapistRepository for PgTherapistRepository {
                 no_show_charge_percent, late_cancel_charge_percent,
                 cancellation_policy, late_policy, rescheduling_policy,
                 custom_tags, practice_id,
+                whatsapp_number, team_size,
+                comms_whatsapp, comms_email, comms_sms,
+                plan_selected, plan_status,
+                support_requested, onboarding_complete, avatar_key,
                 created_at, updated_at"
         )
         .bind(t.id)
@@ -112,6 +128,16 @@ impl TherapistRepository for PgTherapistRepository {
         .bind(&t.custom_tags)
         .bind(t.zoom_connected)
         .bind(t.google_connected)
+        .bind(&t.whatsapp_number)
+        .bind(t.team_size)
+        .bind(t.comms_whatsapp)
+        .bind(t.comms_email)
+        .bind(t.comms_sms)
+        .bind(&t.plan_selected)
+        .bind(&t.plan_status)
+        .bind(t.support_requested)
+        .bind(t.onboarding_complete)
+        .bind(&t.avatar_key)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| IamError::Database(e.to_string()))

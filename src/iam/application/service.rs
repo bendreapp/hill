@@ -4,22 +4,27 @@ use uuid::Uuid;
 use crate::iam::domain::entity::*;
 use crate::iam::domain::error::IamError;
 use crate::iam::domain::port::*;
+use crate::leads::domain::entity::{CreateLeadInput};
+use crate::leads::domain::port::LeadRepository;
 
 // ─── Therapist Service ───────────────────────────────────────────────────────
 
 pub struct TherapistService {
     pub therapist_repo: Arc<dyn TherapistRepository>,
     pub availability_repo: Arc<dyn AvailabilityRepository>,
+    pub lead_repo: Arc<dyn LeadRepository>,
 }
 
 impl TherapistService {
     pub fn new(
         therapist_repo: Arc<dyn TherapistRepository>,
         availability_repo: Arc<dyn AvailabilityRepository>,
+        lead_repo: Arc<dyn LeadRepository>,
     ) -> Self {
         Self {
             therapist_repo,
             availability_repo,
+            lead_repo,
         }
     }
 
@@ -47,6 +52,74 @@ impl TherapistService {
             return Err(IamError::SlugTaken);
         }
         self.therapist_repo.update(therapist).await
+    }
+
+    /// Phase 1: therapist selects a plan (solo/team/clinic/organization).
+    /// Sets plan_selected + plan_status = "pending" and creates a lead entry for HQ.
+    pub async fn select_plan(
+        &self,
+        user_id: Uuid,
+        plan: &str,
+        email: Option<String>,
+    ) -> Result<Therapist, IamError> {
+        // Validate plan value
+        let valid_plans = ["solo", "team", "clinic", "organization"];
+        if !valid_plans.contains(&plan) {
+            return Err(IamError::InvalidPlan);
+        }
+
+        let mut therapist = self
+            .therapist_repo
+            .find_by_id(user_id)
+            .await?
+            .ok_or(IamError::TherapistNotFound)?;
+
+        therapist.plan_selected = Some(plan.to_string());
+        therapist.plan_status = "pending".to_string();
+
+        let updated = self.therapist_repo.update(&therapist).await?;
+
+        // Create a lead entry in Bendre HQ so the team can see this signup
+        let lead_input = CreateLeadInput {
+            full_name: updated.full_name.clone(),
+            email,
+            phone: updated.phone.clone(),
+            reason: None,
+            source: Some("signup".to_string()),
+            preferred_times: None,
+            message: Some(format!("Plan selected: {}", plan)),
+        };
+        // Best-effort — don't fail the whole request if lead creation fails
+        let _ = self.lead_repo.create(user_id, &lead_input).await;
+
+        Ok(updated)
+    }
+
+    /// Phase 1: therapist completes the onboarding wizard.
+    /// Sets avatar_key, bio, support_requested, and onboarding_complete = true.
+    pub async fn complete_onboarding(
+        &self,
+        user_id: Uuid,
+        avatar_key: Option<String>,
+        bio: Option<String>,
+        support_requested: bool,
+    ) -> Result<Therapist, IamError> {
+        let mut therapist = self
+            .therapist_repo
+            .find_by_id(user_id)
+            .await?
+            .ok_or(IamError::TherapistNotFound)?;
+
+        if let Some(k) = avatar_key {
+            therapist.avatar_key = Some(k);
+        }
+        if let Some(b) = bio {
+            therapist.bio = Some(b);
+        }
+        therapist.support_requested = support_requested;
+        therapist.onboarding_complete = true;
+
+        self.therapist_repo.update(&therapist).await
     }
 
     pub async fn get_availability(&self, therapist_id: Uuid) -> Result<Vec<Availability>, IamError> {

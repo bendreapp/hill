@@ -107,10 +107,14 @@ impl AppServices {
         let practice_repo = Arc::new(PgPracticeRepository::new(pool.clone()));
         let invitation_repo = Arc::new(PgInvitationRepository::new(pool.clone()));
         let onboarding_repo = Arc::new(PgOnboardingTokenRepository::new(pool.clone()));
+        // lead_repo shared between IAM (select_plan creates a lead) and Leads module
+        let iam_lead_repo: Arc<dyn crate::leads::domain::port::LeadRepository> =
+            Arc::new(PgLeadRepository::new(pool.clone()));
 
         let therapist_service = TherapistService::new(
             therapist_repo.clone(),
             availability_repo.clone(),
+            iam_lead_repo,
         );
         let practice_service = PracticeService::new(
             practice_repo.clone(),
@@ -190,7 +194,7 @@ impl AppServices {
         let lead_repo = Arc::new(PgLeadRepository::new(pool.clone()));
         let client_invitation_repo = Arc::new(PgClientInvitationRepository::new(pool.clone()));
 
-        let lead_service = LeadService::new(lead_repo);
+        let lead_service = LeadService::new(lead_repo.clone());
         let client_invitation_service = ClientInvitationService::new(client_invitation_repo);
 
         Self {

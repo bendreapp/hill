@@ -39,6 +39,18 @@ pub struct Therapist {
     pub custom_tags: Option<serde_json::Value>,
     pub practice_id: Option<Uuid>,
 
+    // ── Onboarding / Plan fields ──────────────────────────────────────────────
+    pub whatsapp_number: Option<String>,
+    pub team_size: Option<i32>,
+    pub comms_whatsapp: bool,
+    pub comms_email: bool,
+    pub comms_sms: bool,
+    pub plan_selected: Option<String>,
+    pub plan_status: String,
+    pub support_requested: bool,
+    pub onboarding_complete: bool,
+    pub avatar_key: Option<String>,
+
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }

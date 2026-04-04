@@ -1,4 +1,5 @@
 use actix_web::{web, HttpResponse};
+use serde::Deserialize;
 use uuid::Uuid;
 
 use crate::iam::application::service::{TherapistService, PracticeService, OnboardingService};
@@ -105,6 +106,15 @@ pub async fn update_me(
     if let Some(v) = updates.get("cancellation_policy") { therapist.cancellation_policy = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("late_policy") { therapist.late_policy = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("rescheduling_policy") { therapist.rescheduling_policy = v.as_str().map(|s| s.to_string()); }
+    // Onboarding / plan fields
+    if let Some(v) = updates.get("whatsapp_number") { therapist.whatsapp_number = v.as_str().map(|s| s.to_string()); }
+    if let Some(v) = updates.get("team_size") { therapist.team_size = v.as_i64().map(|n| n as i32); }
+    if let Some(v) = updates.get("comms_whatsapp").and_then(|v| v.as_bool()) { therapist.comms_whatsapp = v; }
+    if let Some(v) = updates.get("comms_email").and_then(|v| v.as_bool()) { therapist.comms_email = v; }
+    if let Some(v) = updates.get("comms_sms").and_then(|v| v.as_bool()) { therapist.comms_sms = v; }
+    if let Some(v) = updates.get("avatar_key") { therapist.avatar_key = v.as_str().map(|s| s.to_string()); }
+    if let Some(v) = updates.get("support_requested").and_then(|v| v.as_bool()) { therapist.support_requested = v; }
+    if let Some(v) = updates.get("onboarding_complete").and_then(|v| v.as_bool()) { therapist.onboarding_complete = v; }
 
     let updated = therapist_svc.update(&therapist).await?;
     Ok(HttpResponse::Ok().json(updated))
@@ -170,6 +180,52 @@ pub async fn integration_status(
     })))
 }
 
+// ─── Plan Selection ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct SelectPlanBody {
+    pub plan: String,
+    /// Therapist's email, passed from the client so we can attach it to the lead.
+    /// Optional — the frontend should send auth user email here.
+    pub email: Option<String>,
+}
+
+pub async fn select_plan(
+    user: AuthUser,
+    therapist_svc: web::Data<TherapistService>,
+    body: web::Json<SelectPlanBody>,
+) -> Result<HttpResponse, AppError> {
+    let updated = therapist_svc
+        .select_plan(user.id, &body.plan, body.email.clone())
+        .await?;
+    Ok(HttpResponse::Ok().json(updated))
+}
+
+// ─── Complete Onboarding ─────────────────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CompleteOnboardingBody {
+    pub avatar_key: Option<String>,
+    pub bio: Option<String>,
+    pub support_requested: bool,
+}
+
+pub async fn complete_onboarding(
+    user: AuthUser,
+    therapist_svc: web::Data<TherapistService>,
+    body: web::Json<CompleteOnboardingBody>,
+) -> Result<HttpResponse, AppError> {
+    let updated = therapist_svc
+        .complete_onboarding(
+            user.id,
+            body.avatar_key.clone(),
+            body.bio.clone(),
+            body.support_requested,
+        )
+        .await?;
+    Ok(HttpResponse::Ok().json(updated))
+}
+
 // ─── Route Configuration ─────────────────────────────────────────────────────
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
@@ -177,6 +233,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
 // Therapist
             .route("/api/v1/therapists/me", web::get().to(get_me))
             .route("/api/v1/therapists/me", web::put().to(update_me))
+            .route("/api/v1/therapists/me/select-plan", web::post().to(select_plan))
+            .route("/api/v1/therapists/me/complete-onboarding", web::post().to(complete_onboarding))
             .route("/api/v1/therapists/me/availability", web::get().to(get_availability))
             .route("/api/v1/therapists/me/availability", web::put().to(set_availability))
             .route("/api/v1/therapists/by-slug/{slug}", web::get().to(get_by_slug))

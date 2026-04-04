@@ -38,6 +38,9 @@ pub enum IamError {
     #[error("Onboarding token expired or exhausted")]
     OnboardingTokenInvalid,
 
+    #[error("Invalid plan value")]
+    InvalidPlan,
+
     #[error("Database error: {0}")]
     Database(String),
 }
@@ -57,6 +60,7 @@ impl From<IamError> for AppError {
             IamError::InvitationAlreadyAccepted => AppError::conflict("Invitation already accepted"),
             IamError::OnboardingTokenNotFound => AppError::not_found("Onboarding token not found"),
             IamError::OnboardingTokenInvalid => AppError::bad_request("Token is expired or has reached its usage limit"),
+            IamError::InvalidPlan => AppError::bad_request("Invalid plan. Must be one of: solo, team, clinic, organization"),
             IamError::Database(msg) => AppError::Database { message: msg },
         }
     }
