@@ -10,6 +10,7 @@ pub trait LeadRepository: Send + Sync {
     async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Lead>, LeadsError>;
     async fn list_by_therapist(&self, therapist_id: Uuid, status: Option<&str>, limit: i64, offset: i64) -> Result<(Vec<Lead>, i64), LeadsError>;
     async fn update(&self, id: Uuid, therapist_id: Uuid, input: &UpdateLeadInput) -> Result<Lead, LeadsError>;
+    async fn find_therapist_id_by_slug(&self, slug: &str) -> Result<Option<Uuid>, LeadsError>;
 }
 
 #[async_trait]

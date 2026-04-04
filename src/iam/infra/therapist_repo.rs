@@ -24,7 +24,7 @@ impl TherapistRepository for PgTherapistRepository {
                 id, slug, full_name, display_name, bio, qualifications,
                 phone, avatar_url, timezone,
                 session_duration_mins, buffer_mins, session_rate_inr,
-                booking_page_active, gstin,
+                booking_page_active, show_pricing, gstin,
                 google_connected, zoom_connected,
                 cancellation_hours, min_booking_advance_hours,
                 no_show_charge_percent, late_cancel_charge_percent,
@@ -46,7 +46,7 @@ impl TherapistRepository for PgTherapistRepository {
                 id, slug, full_name, display_name, bio, qualifications,
                 phone, avatar_url, timezone,
                 session_duration_mins, buffer_mins, session_rate_inr,
-                booking_page_active, gstin,
+                booking_page_active, show_pricing, gstin,
                 google_connected, zoom_connected,
                 cancellation_hours, min_booking_advance_hours,
                 no_show_charge_percent, late_cancel_charge_percent,
@@ -68,18 +68,18 @@ impl TherapistRepository for PgTherapistRepository {
                 slug = $2, full_name = $3, display_name = $4, bio = $5,
                 qualifications = $6, phone = $7, avatar_url = $8, timezone = $9,
                 session_duration_mins = $10, buffer_mins = $11, session_rate_inr = $12,
-                booking_page_active = $13, gstin = $14,
-                cancellation_hours = $15, min_booking_advance_hours = $16,
-                no_show_charge_percent = $17, late_cancel_charge_percent = $18,
-                cancellation_policy = $19, late_policy = $20, rescheduling_policy = $21,
-                custom_tags = $22, zoom_connected = $23, google_connected = $24,
+                booking_page_active = $13, show_pricing = $14, gstin = $15,
+                cancellation_hours = $16, min_booking_advance_hours = $17,
+                no_show_charge_percent = $18, late_cancel_charge_percent = $19,
+                cancellation_policy = $20, late_policy = $21, rescheduling_policy = $22,
+                custom_tags = $23, zoom_connected = $24, google_connected = $25,
                 updated_at = now()
             WHERE id = $1
             RETURNING
                 id, slug, full_name, display_name, bio, qualifications,
                 phone, avatar_url, timezone,
                 session_duration_mins, buffer_mins, session_rate_inr,
-                booking_page_active, gstin,
+                booking_page_active, show_pricing, gstin,
                 google_connected, zoom_connected,
                 cancellation_hours, min_booking_advance_hours,
                 no_show_charge_percent, late_cancel_charge_percent,
@@ -100,6 +100,7 @@ impl TherapistRepository for PgTherapistRepository {
         .bind(t.buffer_mins)
         .bind(t.session_rate_inr)
         .bind(t.booking_page_active)
+        .bind(t.show_pricing)
         .bind(&t.gstin)
         .bind(t.cancellation_hours)
         .bind(t.min_booking_advance_hours)

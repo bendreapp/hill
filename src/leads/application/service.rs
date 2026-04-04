@@ -55,6 +55,22 @@ impl LeadService {
             .ok_or(LeadsError::LeadNotFound)?;
         self.lead_repo.update(id, therapist_id, input).await
     }
+
+    /// Public: create a lead from the booking page inquiry form (no auth, resolved by slug)
+    pub async fn create_lead_by_slug(
+        &self,
+        slug: &str,
+        input: &CreateLeadInput,
+    ) -> Result<Lead, LeadsError> {
+        let therapist_id = self
+            .lead_repo
+            .find_therapist_id_by_slug(slug)
+            .await?
+            .ok_or(LeadsError::LeadNotFound)?;
+        let mut input_with_source = input.clone();
+        input_with_source.source = Some("booking_page".to_string());
+        self.lead_repo.create(therapist_id, &input_with_source).await
+    }
 }
 
 // ─── Client Invitation Service ─────────────────────────────────────────────

@@ -93,6 +93,7 @@ pub async fn update_me(
     if let Some(v) = updates.get("slug").and_then(|v| v.as_str()) { therapist.slug = v.to_string(); }
     if let Some(v) = updates.get("gstin") { therapist.gstin = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("booking_page_active").and_then(|v| v.as_bool()) { therapist.booking_page_active = v; }
+    if let Some(v) = updates.get("show_pricing").and_then(|v| v.as_bool()) { therapist.show_pricing = v; }
     if let Some(v) = updates.get("session_duration_mins").and_then(|v| v.as_i64()) { therapist.session_duration_mins = v as i32; }
     if let Some(v) = updates.get("buffer_mins").and_then(|v| v.as_i64()) { therapist.buffer_mins = v as i32; }
     if let Some(v) = updates.get("session_rate_inr").and_then(|v| v.as_i64()) { therapist.session_rate_inr = v as i32; }

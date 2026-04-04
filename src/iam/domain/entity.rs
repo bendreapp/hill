@@ -21,6 +21,7 @@ pub struct Therapist {
     pub session_rate_inr: i32,
 
     pub booking_page_active: bool,
+    pub show_pricing: bool,
     pub gstin: Option<String>,
 
     pub google_connected: bool,

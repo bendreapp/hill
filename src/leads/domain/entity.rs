@@ -17,6 +17,8 @@ pub struct Lead {
     pub session_id: Option<Uuid>,
     pub client_id: Option<Uuid>,
     pub notes: Option<String>,
+    pub preferred_times: Option<serde_json::Value>,
+    pub message: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -28,6 +30,10 @@ pub struct CreateLeadInput {
     pub phone: Option<String>,
     pub reason: Option<String>,
     pub source: Option<String>,
+    /// Free-text preferred time slots, e.g. ["April 10, 3pm", "weekday evenings"]
+    pub preferred_times: Option<Vec<String>>,
+    /// "What brings you here?" message from the public inquiry form
+    pub message: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
