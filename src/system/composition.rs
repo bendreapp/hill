@@ -40,9 +40,11 @@ use crate::billing::infra::invoice_repo::PgInvoiceRepository;
 use crate::billing::infra::razorpay_gateway::RazorpayGateway;
 
 // ─── Engagement ──────────────────────────────────────────────────────────────
-use crate::engagement::application::service::{ResourceService, IntakeService, BroadcastService};
+use crate::engagement::application::service::{ResourceService, IntakeService, IntakeQuestionService, BroadcastService, MessageTemplateService};
 use crate::engagement::infra::resource_repo::PgResourceRepository;
 use crate::engagement::infra::intake_form_repo::PgIntakeFormRepository;
+use crate::engagement::infra::intake_question_repo::PgIntakeFormQuestionRepository;
+use crate::engagement::infra::message_template_repo::PgMessageTemplateRepository;
 use crate::engagement::infra::broadcast_adapter::HttpBroadcastAdapter;
 use crate::engagement::infra::encryption_adapter::EngagementEncryptionAdapter;
 
@@ -84,7 +86,9 @@ pub struct AppServices {
     // Engagement
     pub resource_service: ResourceService,
     pub intake_service: IntakeService,
+    pub intake_question_service: IntakeQuestionService,
     pub broadcast_service: BroadcastService,
+    pub message_template_service: MessageTemplateService,
 
     // Analytics
     pub analytics_service: AnalyticsService,
@@ -182,9 +186,17 @@ impl AppServices {
         let engagement_encryption: Arc<dyn crate::engagement::domain::port::EngagementEncryptionPort> =
             Arc::new(EngagementEncryptionAdapter::new(encryption.clone()));
 
+        let message_template_repo: Arc<dyn crate::engagement::domain::port::MessageTemplateRepository> =
+            Arc::new(PgMessageTemplateRepository::new(pool.clone()));
+
+        let question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository> =
+            Arc::new(PgIntakeFormQuestionRepository::new(pool.clone()));
+
         let resource_service = ResourceService::new(resource_repo.clone());
         let intake_service = IntakeService::new(intake_repo.clone(), engagement_encryption);
+        let intake_question_service = IntakeQuestionService::new(question_repo);
         let broadcast_service = BroadcastService::new(broadcast_port);
+        let message_template_service = MessageTemplateService::new(message_template_repo);
 
         // ── Analytics ────────────────────────────────────────────────────
         let analytics_repo = Arc::new(PgAnalyticsRepository::new(pool.clone()));
@@ -194,8 +206,20 @@ impl AppServices {
         let lead_repo = Arc::new(PgLeadRepository::new(pool.clone()));
         let client_invitation_repo = Arc::new(PgClientInvitationRepository::new(pool.clone()));
 
-        let lead_service = LeadService::new(lead_repo.clone());
-        let client_invitation_service = ClientInvitationService::new(client_invitation_repo);
+        let resend_api_key = config.resend_api_key.clone().unwrap_or_default();
+        let frontend_url = config.frontend_url.clone();
+
+        let lead_service = LeadService::new(
+            lead_repo.clone(),
+            client_repo.clone(),
+            resend_api_key.clone(),
+            frontend_url.clone(),
+        );
+        let client_invitation_service = ClientInvitationService::new(
+            client_invitation_repo,
+            resend_api_key,
+            frontend_url,
+        );
 
         Self {
             therapist_service,
@@ -214,7 +238,9 @@ impl AppServices {
             payment_service,
             resource_service,
             intake_service,
+            intake_question_service,
             broadcast_service,
+            message_template_service,
             analytics_service,
             lead_service,
             client_invitation_service,

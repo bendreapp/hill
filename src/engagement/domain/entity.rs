@@ -127,6 +127,63 @@ pub struct SubmitIntakeResponseInput {
     pub responses: String,
 }
 
+// ─── Intake Form Question ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct IntakeFormQuestion {
+    pub id: Uuid,
+    pub therapist_id: Uuid,
+    pub question_text: String,
+    pub field_type: String,
+    pub options: Option<serde_json::Value>,
+    pub is_required: bool,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct CreateIntakeQuestionInput {
+    pub question_text: String,
+    pub field_type: String,
+    pub options: Option<serde_json::Value>,
+    pub is_required: Option<bool>,
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpdateIntakeQuestionInput {
+    pub question_text: Option<String>,
+    pub field_type: Option<String>,
+    pub options: Option<serde_json::Value>,
+    pub is_required: Option<bool>,
+    pub sort_order: Option<i32>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct ReorderQuestionsInput {
+    pub ids: Vec<Uuid>,
+}
+
+// ─── Message Templates ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct MessageTemplate {
+    pub id: Uuid,
+    pub therapist_id: Uuid,
+    pub template_key: String,
+    pub subject: String,
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpsertMessageTemplateInput {
+    pub subject: String,
+    pub body: String,
+}
+
 // ─── Broadcast ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

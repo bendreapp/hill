@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::leads::domain::entity::*;
 use crate::leads::domain::error::LeadsError;
-use crate::leads::domain::port::ClientInvitationRepository;
+use crate::leads::domain::port::{ClientInvitationRepository};
 
 pub struct PgClientInvitationRepository {
     pool: PgPool,
@@ -28,7 +28,7 @@ impl ClientInvitationRepository for PgClientInvitationRepository {
         let row = sqlx::query_as::<_, ClientInvitation>(
             "INSERT INTO client_invitations (therapist_id, client_id, email, phone)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, created_at"
+             RETURNING id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at"
         )
         .bind(therapist_id)
         .bind(client_id)
@@ -41,7 +41,7 @@ impl ClientInvitationRepository for PgClientInvitationRepository {
 
     async fn find_by_token(&self, token: &str) -> Result<Option<ClientInvitation>, LeadsError> {
         let row = sqlx::query_as::<_, ClientInvitation>(
-            "SELECT id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, created_at
+            "SELECT id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at
              FROM client_invitations WHERE token = $1"
         )
         .bind(token)
@@ -52,7 +52,7 @@ impl ClientInvitationRepository for PgClientInvitationRepository {
 
     async fn find_by_client(&self, client_id: Uuid) -> Result<Option<ClientInvitation>, LeadsError> {
         let row = sqlx::query_as::<_, ClientInvitation>(
-            "SELECT id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, created_at
+            "SELECT id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at
              FROM client_invitations WHERE client_id = $1
              ORDER BY created_at DESC LIMIT 1"
         )
@@ -66,9 +66,21 @@ impl ClientInvitationRepository for PgClientInvitationRepository {
         let row = sqlx::query_as::<_, ClientInvitation>(
             "UPDATE client_invitations SET status = 'accepted', claimed_at = now()
              WHERE token = $1
-             RETURNING id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, created_at"
+             RETURNING id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at"
         )
         .bind(token)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    async fn mark_invite_sent(&self, invitation_id: Uuid) -> Result<ClientInvitation, LeadsError> {
+        let row = sqlx::query_as::<_, ClientInvitation>(
+            "UPDATE client_invitations SET invite_sent_at = now()
+             WHERE id = $1
+             RETURNING id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at"
+        )
+        .bind(invitation_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)

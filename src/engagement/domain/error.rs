@@ -11,6 +11,15 @@ pub enum EngagementError {
     #[error("Intake response not found")]
     IntakeResponseNotFound,
 
+    #[error("Intake form question not found")]
+    IntakeQuestionNotFound,
+
+    #[error("Message template not found")]
+    MessageTemplateNotFound,
+
+    #[error("Invalid template key: {0}")]
+    InvalidTemplateKey(String),
+
     #[error("Broadcast failed: {0}")]
     BroadcastFailed(String),
 
@@ -24,10 +33,15 @@ pub enum EngagementError {
 impl From<EngagementError> for AppError {
     fn from(err: EngagementError) -> Self {
         match err {
+            EngagementError::MessageTemplateNotFound => AppError::not_found("Message template not found"),
+            EngagementError::InvalidTemplateKey(msg) => AppError::BadRequest { message: msg },
             EngagementError::ResourceNotFound => AppError::not_found("Resource not found"),
             EngagementError::IntakeFormNotFound => AppError::not_found("Intake form not found"),
             EngagementError::IntakeResponseNotFound => {
                 AppError::not_found("Intake response not found")
+            }
+            EngagementError::IntakeQuestionNotFound => {
+                AppError::not_found("Intake form question not found")
             }
             EngagementError::BroadcastFailed(msg) => AppError::Integration { message: msg },
             EngagementError::EncryptionFailed(msg) => AppError::Encryption { message: msg },

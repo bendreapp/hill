@@ -2,11 +2,12 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::engagement::application::service::{BroadcastService, IntakeService, ResourceService};
+use crate::engagement::application::service::{BroadcastService, IntakeQuestionService, IntakeService, MessageTemplateService, ResourceService};
 use crate::engagement::domain::entity::{
-    BroadcastInput, CreateIntakeFormInput, CreateIntakeResponseInput, CreateResourceInput,
-    ShareResourceInput, SubmitIntakeResponseInput, UnshareResourceInput, UpdateIntakeFormInput,
-    UpdateResourceInput,
+    BroadcastInput, CreateIntakeFormInput, CreateIntakeQuestionInput, CreateIntakeResponseInput,
+    CreateResourceInput, ReorderQuestionsInput, ShareResourceInput, SubmitIntakeResponseInput,
+    UnshareResourceInput, UpdateIntakeFormInput, UpdateIntakeQuestionInput, UpdateResourceInput,
+    UpsertMessageTemplateInput,
 };
 use crate::shared::error::AppError;
 use crate::shared::types::{AuthUser, Paginated};
@@ -238,6 +239,75 @@ pub async fn submit_intake_response(
     Ok(HttpResponse::Ok().json(resp))
 }
 
+// ─── Message Template Handlers ──────────────────────────────────────────────
+
+pub async fn list_message_templates(
+    user: AuthUser,
+    svc: web::Data<MessageTemplateService>,
+) -> Result<HttpResponse, AppError> {
+    let templates = svc.list_templates(user.id).await?;
+    Ok(HttpResponse::Ok().json(templates))
+}
+
+pub async fn update_message_template(
+    user: AuthUser,
+    svc: web::Data<MessageTemplateService>,
+    key: web::Path<String>,
+    body: web::Json<UpsertMessageTemplateInput>,
+) -> Result<HttpResponse, AppError> {
+    let template = svc
+        .update_template(user.id, &key, &body.subject, &body.body)
+        .await?;
+    Ok(HttpResponse::Ok().json(template))
+}
+
+// ─── Intake Form Question Handlers ──────────────────────────────────────────
+
+pub async fn list_intake_questions(
+    user: AuthUser,
+    svc: web::Data<IntakeQuestionService>,
+) -> Result<HttpResponse, AppError> {
+    let questions = svc.list_questions(user.id).await?;
+    Ok(HttpResponse::Ok().json(questions))
+}
+
+pub async fn create_intake_question(
+    user: AuthUser,
+    svc: web::Data<IntakeQuestionService>,
+    body: web::Json<CreateIntakeQuestionInput>,
+) -> Result<HttpResponse, AppError> {
+    let question = svc.create_question(user.id, &body).await?;
+    Ok(HttpResponse::Created().json(question))
+}
+
+pub async fn update_intake_question(
+    user: AuthUser,
+    svc: web::Data<IntakeQuestionService>,
+    id: web::Path<Uuid>,
+    body: web::Json<UpdateIntakeQuestionInput>,
+) -> Result<HttpResponse, AppError> {
+    let question = svc.update_question(*id, user.id, &body).await?;
+    Ok(HttpResponse::Ok().json(question))
+}
+
+pub async fn delete_intake_question(
+    user: AuthUser,
+    svc: web::Data<IntakeQuestionService>,
+    id: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    svc.delete_question(*id, user.id).await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn reorder_intake_questions(
+    user: AuthUser,
+    svc: web::Data<IntakeQuestionService>,
+    body: web::Json<ReorderQuestionsInput>,
+) -> Result<HttpResponse, AppError> {
+    let questions = svc.reorder_questions(user.id, &body.ids).await?;
+    Ok(HttpResponse::Ok().json(questions))
+}
+
 // ─── Broadcast Handler ──────────────────────────────────────────────────────
 
 pub async fn send_broadcast(
@@ -285,5 +355,15 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/api/v1/intake-responses/by-token/{token}", web::get().to(get_intake_response_by_token))
             .route("/api/v1/clients/{client_id}/intake-responses", web::get().to(list_client_intake_responses))
             // Broadcast
-            .route("/api/v1/broadcast", web::post().to(send_broadcast));
+            .route("/api/v1/broadcast", web::post().to(send_broadcast))
+            // Message Templates
+            .route("/api/v1/message-templates", web::get().to(list_message_templates))
+            .route("/api/v1/message-templates/{key}", web::put().to(update_message_template))
+            // Intake Form Questions (custom question builder)
+            // IMPORTANT: /reorder must come before /{id} to avoid routing conflicts
+            .route("/api/v1/intake-forms/questions", web::get().to(list_intake_questions))
+            .route("/api/v1/intake-forms/questions", web::post().to(create_intake_question))
+            .route("/api/v1/intake-forms/questions/reorder", web::patch().to(reorder_intake_questions))
+            .route("/api/v1/intake-forms/questions/{id}", web::put().to(update_intake_question))
+            .route("/api/v1/intake-forms/questions/{id}", web::delete().to(delete_intake_question));
 }

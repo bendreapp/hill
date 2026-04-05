@@ -115,6 +115,63 @@ pub trait IntakeFormRepository: Send + Sync {
     ) -> Result<IntakeResponse, EngagementError>;
 }
 
+// ─── Intake Form Question Repository ────────────────────────────────────────
+
+#[async_trait]
+pub trait IntakeFormQuestionRepository: Send + Sync {
+    async fn list_by_therapist(
+        &self,
+        therapist_id: Uuid,
+    ) -> Result<Vec<IntakeFormQuestion>, EngagementError>;
+
+    async fn create(
+        &self,
+        therapist_id: Uuid,
+        input: &CreateIntakeQuestionInput,
+    ) -> Result<IntakeFormQuestion, EngagementError>;
+
+    async fn update(
+        &self,
+        id: Uuid,
+        therapist_id: Uuid,
+        input: &UpdateIntakeQuestionInput,
+    ) -> Result<IntakeFormQuestion, EngagementError>;
+
+    async fn delete(
+        &self,
+        id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<(), EngagementError>;
+
+    async fn reorder(
+        &self,
+        therapist_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<IntakeFormQuestion>, EngagementError>;
+
+    async fn seed_defaults(
+        &self,
+        therapist_id: Uuid,
+    ) -> Result<Vec<IntakeFormQuestion>, EngagementError>;
+}
+
+// ─── Message Template Repository ────────────────────────────────────────────
+
+#[async_trait]
+pub trait MessageTemplateRepository: Send + Sync {
+    async fn find_all_by_therapist(&self, therapist_id: Uuid) -> Result<Vec<MessageTemplate>, EngagementError>;
+
+    async fn find_by_key(&self, therapist_id: Uuid, key: &str) -> Result<Option<MessageTemplate>, EngagementError>;
+
+    async fn upsert(
+        &self,
+        therapist_id: Uuid,
+        key: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<MessageTemplate, EngagementError>;
+}
+
 // ─── Broadcast Port ─────────────────────────────────────────────────────────
 
 #[async_trait]

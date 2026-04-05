@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use chrono::Utc;
 use uuid::Uuid;
 
 use crate::engagement::domain::entity::*;
@@ -237,6 +238,189 @@ impl IntakeService {
         if let Some(ref val) = resp.responses {
             resp.responses = self.encryption.decrypt(val).ok();
         }
+    }
+}
+
+// ─── Message Template Service ────────────────────────────────────────────────
+
+pub struct MessageTemplateService {
+    pub template_repo: Arc<dyn crate::engagement::domain::port::MessageTemplateRepository>,
+}
+
+/// Default templates returned when no custom template has been saved.
+struct DefaultTemplate {
+    key: &'static str,
+    subject: &'static str,
+    body: &'static str,
+}
+
+const DEFAULTS: &[DefaultTemplate] = &[
+    DefaultTemplate {
+        key: "inquiry_ack",
+        subject: "Thanks for reaching out",
+        body: "Hi {client_name}, thanks for reaching out. I'll review your message and get back to you shortly.",
+    },
+    DefaultTemplate {
+        key: "intake_invite",
+        subject: "Please fill out my intake form",
+        body: "Hi {client_name}, please fill out this intake form so I can understand your needs better: {intake_link}",
+    },
+    DefaultTemplate {
+        key: "portal_invite",
+        subject: "Welcome — set up your client portal",
+        body: "Hi {client_name}, welcome aboard! Set up your client portal here: {portal_link}",
+    },
+    DefaultTemplate {
+        key: "rejection",
+        subject: "Re: Your inquiry",
+        body: "Hi {client_name}, thank you for reaching out. After reviewing your inquiry, I don't think I'm the right fit for your needs at this time. I wish you the best.",
+    },
+];
+
+const VALID_KEYS: &[&str] = &["inquiry_ack", "intake_invite", "portal_invite", "rejection"];
+
+impl MessageTemplateService {
+    pub fn new(template_repo: Arc<dyn crate::engagement::domain::port::MessageTemplateRepository>) -> Self {
+        Self { template_repo }
+    }
+
+    /// Returns all 4 templates for the therapist.
+    /// For any key that doesn't have a custom template yet, returns the default.
+    pub async fn list_templates(&self, therapist_id: Uuid) -> Result<Vec<MessageTemplate>, EngagementError> {
+        let saved = self.template_repo.find_all_by_therapist(therapist_id).await?;
+
+        let templates = DEFAULTS
+            .iter()
+            .map(|default| {
+                // If the therapist has customized this key, use their version
+                saved
+                    .iter()
+                    .find(|t| t.template_key == default.key)
+                    .cloned()
+                    .unwrap_or_else(|| MessageTemplate {
+                        id: uuid::Uuid::nil(),
+                        therapist_id,
+                        template_key: default.key.to_string(),
+                        subject: default.subject.to_string(),
+                        body: default.body.to_string(),
+                        created_at: chrono::Utc::now(),
+                        updated_at: chrono::Utc::now(),
+                    })
+            })
+            .collect();
+
+        Ok(templates)
+    }
+
+    /// Saves (upserts) a custom template for the therapist.
+    pub async fn update_template(
+        &self,
+        therapist_id: Uuid,
+        key: &str,
+        subject: &str,
+        body: &str,
+    ) -> Result<MessageTemplate, EngagementError> {
+        if !VALID_KEYS.contains(&key) {
+            return Err(EngagementError::InvalidTemplateKey(format!(
+                "'{}' is not a valid template key",
+                key
+            )));
+        }
+
+        self.template_repo
+            .upsert(therapist_id, key, subject, body)
+            .await
+    }
+
+    /// Returns the template (custom or default) for a specific key — for use when sending emails.
+    pub async fn get_template_for_sending(
+        &self,
+        therapist_id: Uuid,
+        key: &str,
+    ) -> Result<MessageTemplate, EngagementError> {
+        if !VALID_KEYS.contains(&key) {
+            return Err(EngagementError::InvalidTemplateKey(format!(
+                "'{}' is not a valid template key",
+                key
+            )));
+        }
+
+        let saved = self.template_repo.find_by_key(therapist_id, key).await?;
+
+        if let Some(template) = saved {
+            return Ok(template);
+        }
+
+        // Return default
+        let default = DEFAULTS.iter().find(|d| d.key == key).unwrap();
+        Ok(MessageTemplate {
+            id: uuid::Uuid::nil(),
+            therapist_id,
+            template_key: default.key.to_string(),
+            subject: default.subject.to_string(),
+            body: default.body.to_string(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
+        })
+    }
+}
+
+// ─── Intake Question Service ─────────────────────────────────────────────────
+
+pub struct IntakeQuestionService {
+    pub question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository>,
+}
+
+impl IntakeQuestionService {
+    pub fn new(
+        question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository>,
+    ) -> Self {
+        Self { question_repo }
+    }
+
+    /// Returns the therapist's questions. Seeds defaults if none exist yet.
+    pub async fn list_questions(
+        &self,
+        therapist_id: Uuid,
+    ) -> Result<Vec<IntakeFormQuestion>, EngagementError> {
+        let existing = self.question_repo.list_by_therapist(therapist_id).await?;
+        if existing.is_empty() {
+            return self.question_repo.seed_defaults(therapist_id).await;
+        }
+        Ok(existing)
+    }
+
+    pub async fn create_question(
+        &self,
+        therapist_id: Uuid,
+        input: &CreateIntakeQuestionInput,
+    ) -> Result<IntakeFormQuestion, EngagementError> {
+        self.question_repo.create(therapist_id, input).await
+    }
+
+    pub async fn update_question(
+        &self,
+        id: Uuid,
+        therapist_id: Uuid,
+        input: &UpdateIntakeQuestionInput,
+    ) -> Result<IntakeFormQuestion, EngagementError> {
+        self.question_repo.update(id, therapist_id, input).await
+    }
+
+    pub async fn delete_question(
+        &self,
+        id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<(), EngagementError> {
+        self.question_repo.delete(id, therapist_id).await
+    }
+
+    pub async fn reorder_questions(
+        &self,
+        therapist_id: Uuid,
+        ids: &[Uuid],
+    ) -> Result<Vec<IntakeFormQuestion>, EngagementError> {
+        self.question_repo.reorder(therapist_id, ids).await
     }
 }
 
