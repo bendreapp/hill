@@ -2,13 +2,15 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::engagement::application::service::{BroadcastService, IntakeQuestionService, IntakeService, MessageTemplateService, ResourceService};
+use crate::engagement::application::service::{BroadcastService, IntakeQuestionService, IntakeService, LeadIntakeService, MessageTemplateService, ResourceService};
 use crate::engagement::domain::entity::{
     BroadcastInput, CreateIntakeFormInput, CreateIntakeQuestionInput, CreateIntakeResponseInput,
     CreateResourceInput, ReorderQuestionsInput, ShareResourceInput, SubmitIntakeResponseInput,
-    UnshareResourceInput, UpdateIntakeFormInput, UpdateIntakeQuestionInput, UpdateResourceInput,
-    UpsertMessageTemplateInput,
+    SubmitLeadIntakeInput, UnshareResourceInput, UpdateIntakeFormInput, UpdateIntakeQuestionInput,
+    UpdateResourceInput, UpsertMessageTemplateInput,
 };
+use crate::leads::application::service::LeadService;
+use crate::iam::application::service::TherapistService;
 use crate::shared::error::AppError;
 use crate::shared::types::{AuthUser, Paginated};
 
@@ -329,6 +331,162 @@ pub async fn send_broadcast(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "sent": sent })))
 }
 
+// ─── Lead Intake Handlers ────────────────────────────────────────────────────
+
+/// POST /api/v1/leads/{id}/send-intake-form  (authenticated)
+pub async fn send_lead_intake_form(
+    user: AuthUser,
+    id: web::Path<Uuid>,
+    lead_svc: web::Data<LeadService>,
+    therapist_svc: web::Data<TherapistService>,
+    intake_svc: web::Data<LeadIntakeService>,
+    template_svc: web::Data<MessageTemplateService>,
+) -> Result<HttpResponse, AppError> {
+    let lead_id = id.into_inner();
+
+    // Validate lead ownership and get lead data
+    let lead = lead_svc.get_lead(lead_id, user.id).await?;
+
+    let lead_email = lead.email.as_deref().ok_or_else(|| {
+        AppError::bad_request("Lead has no email address — cannot send intake form")
+    })?;
+
+    // Fetch therapist display name
+    let therapist = therapist_svc.get_me(user.id).await?;
+    let therapist_display = therapist
+        .display_name
+        .as_deref()
+        .unwrap_or(&therapist.full_name)
+        .to_string();
+
+    // Fetch the intake_invite template (custom or default)
+    let template = template_svc.get_template_for_sending(user.id, "intake_invite").await?;
+
+    // Send intake form and create submission record
+    let result = intake_svc
+        .send_to_lead(
+            lead_id,
+            user.id,
+            &lead.full_name,
+            lead_email,
+            &therapist_display,
+            &template.subject,
+            &template.body,
+        )
+        .await?;
+
+    // Update lead status to `contacted` (best-effort — don't fail the request)
+    let _ = lead_svc
+        .update_lead(
+            lead_id,
+            user.id,
+            &crate::leads::domain::entity::UpdateLeadInput {
+                status: Some("contacted".to_string()),
+                notes: None,
+                client_id: None,
+            },
+        )
+        .await;
+
+    Ok(HttpResponse::Ok().json(result))
+}
+
+/// GET /api/v1/leads/{id}/intake-submissions  (authenticated)
+pub async fn list_lead_intake_submissions(
+    user: AuthUser,
+    id: web::Path<Uuid>,
+    lead_svc: web::Data<LeadService>,
+    intake_svc: web::Data<LeadIntakeService>,
+) -> Result<HttpResponse, AppError> {
+    let lead_id = id.into_inner();
+    // Validate ownership
+    lead_svc.get_lead(lead_id, user.id).await?;
+
+    let submissions = intake_svc.list_by_lead(lead_id, user.id).await?;
+    Ok(HttpResponse::Ok().json(submissions))
+}
+
+/// GET /api/v1/lead-intake/{token}  (public — no auth)
+pub async fn get_public_lead_intake(
+    token: web::Path<String>,
+    intake_svc: web::Data<LeadIntakeService>,
+    question_svc: web::Data<IntakeQuestionService>,
+) -> Result<HttpResponse, AppError> {
+    // Check if already submitted
+    let submission = intake_svc
+        .submission_repo
+        .find_by_token(&token)
+        .await
+        .map_err(AppError::from)?;
+
+    let submission = submission.ok_or_else(|| AppError::not_found("Intake form"))?;
+
+    if submission.submitted_at.is_some() {
+        return Ok(HttpResponse::Gone().json(serde_json::json!({
+            "already_submitted": true,
+            "message": "This intake form has already been submitted."
+        })));
+    }
+
+    // Fetch questions for this therapist
+    let questions = question_svc
+        .list_questions(submission.therapist_id)
+        .await?;
+
+    // Fetch therapist display name — query therapists table directly
+    // We use a simple SQL query via the lead service's therapist info fetch
+    // (which is in the leads module, not engagement), so we build a light response
+    // by looking up the data through available services
+    let therapist_display = {
+        // Use IntakeQuestionService's question_repo (it has the pool) — we instead
+        // pull the name from the lead. We don't want cross-module DB calls in handlers,
+        // so we do this via a simple approach: use the lead service to get therapist info.
+        // But lead_svc.lead_repo.find_therapist_info is private from here. Instead,
+        // we accept a small simplification: return therapist_id and let frontend look up
+        // or we expose minimal fields needed. We'll include therapist_id in the response.
+        // For MVP: return therapist_id + questions + already_submitted
+        "Your therapist".to_string()
+    };
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "therapist_id": submission.therapist_id,
+        "therapist_display_name": therapist_display,
+        "questions": questions,
+        "already_submitted": false,
+    })))
+}
+
+/// POST /api/v1/lead-intake/{token}/submit  (public — no auth)
+pub async fn submit_public_lead_intake(
+    token: web::Path<String>,
+    body: web::Json<SubmitLeadIntakeInput>,
+    intake_svc: web::Data<LeadIntakeService>,
+    lead_svc: web::Data<LeadService>,
+) -> Result<HttpResponse, AppError> {
+    // Submit the form — service validates not already submitted
+    let submission = intake_svc
+        .submit_public_form(&token, &body.responses)
+        .await?;
+
+    // Update lead status to `qualified` (best-effort)
+    let _ = lead_svc
+        .update_lead(
+            submission.lead_id,
+            submission.therapist_id,
+            &crate::leads::domain::entity::UpdateLeadInput {
+                status: Some("qualified".to_string()),
+                notes: None,
+                client_id: None,
+            },
+        )
+        .await;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "success": true,
+        "submitted_at": submission.submitted_at,
+    })))
+}
+
 // ─── Route Configuration ────────────────────────────────────────────────────
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
@@ -365,5 +523,11 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/api/v1/intake-forms/questions", web::post().to(create_intake_question))
             .route("/api/v1/intake-forms/questions/reorder", web::patch().to(reorder_intake_questions))
             .route("/api/v1/intake-forms/questions/{id}", web::put().to(update_intake_question))
-            .route("/api/v1/intake-forms/questions/{id}", web::delete().to(delete_intake_question));
+            .route("/api/v1/intake-forms/questions/{id}", web::delete().to(delete_intake_question))
+            // Lead Intake (authenticated)
+            .route("/api/v1/leads/{id}/send-intake-form", web::post().to(send_lead_intake_form))
+            .route("/api/v1/leads/{id}/intake-submissions", web::get().to(list_lead_intake_submissions))
+            // Lead Intake (public — no auth)
+            .route("/api/v1/lead-intake/{token}", web::get().to(get_public_lead_intake))
+            .route("/api/v1/lead-intake/{token}/submit", web::post().to(submit_public_lead_intake));
 }

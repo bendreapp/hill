@@ -184,6 +184,44 @@ pub struct UpsertMessageTemplateInput {
     pub body: String,
 }
 
+// ─── Lead Intake Submission ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct LeadIntakeSubmission {
+    pub id: Uuid,
+    pub lead_id: Uuid,
+    pub therapist_id: Uuid,
+    pub access_token: String,
+    pub responses: Option<serde_json::Value>,
+    pub sent_at: DateTime<Utc>,
+    pub submitted_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Payload returned after therapist sends an intake form to a lead
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct SendLeadIntakeResponse {
+    pub submission_id: Uuid,
+    pub access_token: String,
+    pub sent_at: DateTime<Utc>,
+}
+
+/// Public: data returned when lead opens their intake link
+#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
+pub struct PublicLeadIntakeForm {
+    pub therapist_display_name: String,
+    pub lead_name: String,
+    pub questions: Vec<crate::engagement::domain::entity::IntakeFormQuestion>,
+    pub already_submitted: bool,
+}
+
+/// Public: lead submits intake responses
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct SubmitLeadIntakeInput {
+    /// Array of { question_id, question_text, field_type, answer }
+    pub responses: serde_json::Value,
+}
+
 // ─── Broadcast ──────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

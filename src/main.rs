@@ -78,6 +78,7 @@ async fn main() -> std::io::Result<()> {
     let resource_svc = web::Data::new(services.resource_service);
     let intake_svc = web::Data::new(services.intake_service);
     let intake_question_svc = web::Data::new(services.intake_question_service);
+    let lead_intake_svc = web::Data::new(services.lead_intake_service);
     let broadcast_svc = web::Data::new(services.broadcast_service);
     let message_template_svc = web::Data::new(services.message_template_service);
     let analytics_svc = web::Data::new(services.analytics_service);
@@ -130,6 +131,7 @@ async fn main() -> std::io::Result<()> {
             .app_data(resource_svc.clone())
             .app_data(intake_svc.clone())
             .app_data(intake_question_svc.clone())
+            .app_data(lead_intake_svc.clone())
             .app_data(broadcast_svc.clone())
             .app_data(message_template_svc.clone())
             // Analytics services

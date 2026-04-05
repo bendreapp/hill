@@ -40,10 +40,11 @@ use crate::billing::infra::invoice_repo::PgInvoiceRepository;
 use crate::billing::infra::razorpay_gateway::RazorpayGateway;
 
 // ─── Engagement ──────────────────────────────────────────────────────────────
-use crate::engagement::application::service::{ResourceService, IntakeService, IntakeQuestionService, BroadcastService, MessageTemplateService};
+use crate::engagement::application::service::{ResourceService, IntakeService, IntakeQuestionService, LeadIntakeService, BroadcastService, MessageTemplateService};
 use crate::engagement::infra::resource_repo::PgResourceRepository;
 use crate::engagement::infra::intake_form_repo::PgIntakeFormRepository;
 use crate::engagement::infra::intake_question_repo::PgIntakeFormQuestionRepository;
+use crate::engagement::infra::lead_intake_repo::PgLeadIntakeSubmissionRepository;
 use crate::engagement::infra::message_template_repo::PgMessageTemplateRepository;
 use crate::engagement::infra::broadcast_adapter::HttpBroadcastAdapter;
 use crate::engagement::infra::encryption_adapter::EngagementEncryptionAdapter;
@@ -87,6 +88,7 @@ pub struct AppServices {
     pub resource_service: ResourceService,
     pub intake_service: IntakeService,
     pub intake_question_service: IntakeQuestionService,
+    pub lead_intake_service: LeadIntakeService,
     pub broadcast_service: BroadcastService,
     pub message_template_service: MessageTemplateService,
 
@@ -192,9 +194,18 @@ impl AppServices {
         let question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository> =
             Arc::new(PgIntakeFormQuestionRepository::new(pool.clone()));
 
+        let lead_intake_repo: Arc<dyn crate::engagement::domain::port::LeadIntakeSubmissionRepository> =
+            Arc::new(PgLeadIntakeSubmissionRepository::new(pool.clone()));
+
         let resource_service = ResourceService::new(resource_repo.clone());
         let intake_service = IntakeService::new(intake_repo.clone(), engagement_encryption);
-        let intake_question_service = IntakeQuestionService::new(question_repo);
+        let intake_question_service = IntakeQuestionService::new(question_repo.clone());
+        let lead_intake_service = LeadIntakeService::new(
+            lead_intake_repo,
+            question_repo,
+            config.resend_api_key.clone().unwrap_or_default(),
+            config.frontend_url.clone(),
+        );
         let broadcast_service = BroadcastService::new(broadcast_port);
         let message_template_service = MessageTemplateService::new(message_template_repo);
 
@@ -239,6 +250,7 @@ impl AppServices {
             resource_service,
             intake_service,
             intake_question_service,
+            lead_intake_service,
             broadcast_service,
             message_template_service,
             analytics_service,

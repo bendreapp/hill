@@ -1,10 +1,10 @@
 use std::sync::Arc;
-use chrono::Utc;
 use uuid::Uuid;
 
 use crate::engagement::domain::entity::*;
 use crate::engagement::domain::error::EngagementError;
 use crate::engagement::domain::port::*;
+use crate::shared::email::{send_email, EmailParams};
 
 // ─── Resource Service ───────────────────────────────────────────────────────
 
@@ -422,6 +422,158 @@ impl IntakeQuestionService {
     ) -> Result<Vec<IntakeFormQuestion>, EngagementError> {
         self.question_repo.reorder(therapist_id, ids).await
     }
+}
+
+// ─── Lead Intake Service ─────────────────────────────────────────────────────
+
+pub struct LeadIntakeService {
+    pub submission_repo: Arc<dyn crate::engagement::domain::port::LeadIntakeSubmissionRepository>,
+    pub question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository>,
+    pub resend_api_key: String,
+    pub frontend_url: String,
+}
+
+impl LeadIntakeService {
+    pub fn new(
+        submission_repo: Arc<dyn crate::engagement::domain::port::LeadIntakeSubmissionRepository>,
+        question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository>,
+        resend_api_key: String,
+        frontend_url: String,
+    ) -> Self {
+        Self {
+            submission_repo,
+            question_repo,
+            resend_api_key,
+            frontend_url,
+        }
+    }
+
+    /// Send an intake form to a lead. Creates a submission record and sends email.
+    /// Also updates lead status to `contacted`.
+    pub async fn send_to_lead(
+        &self,
+        lead_id: Uuid,
+        therapist_id: Uuid,
+        lead_name: &str,
+        lead_email: &str,
+        therapist_display_name: &str,
+        template_subject: &str,
+        template_body: &str,
+    ) -> Result<SendLeadIntakeResponse, EngagementError> {
+        // Generate unique access token
+        let access_token = Uuid::new_v4().to_string();
+
+        // Create submission record
+        let submission = self.submission_repo
+            .create(lead_id, therapist_id, &access_token)
+            .await?;
+
+        // Build intake link
+        let intake_link = format!("{}/intake/submit/{}", self.frontend_url, access_token);
+
+        // Replace template variables
+        let subject = template_subject
+            .replace("{client_name}", lead_name)
+            .replace("{therapist_name}", therapist_display_name)
+            .replace("{intake_link}", &intake_link);
+
+        let body_text = template_body
+            .replace("{client_name}", lead_name)
+            .replace("{therapist_name}", therapist_display_name)
+            .replace("{intake_link}", &format!(
+                "<a href=\"{}\" style=\"background:#5C7A6B;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block\">Fill out intake form</a>",
+                intake_link
+            ));
+
+        let html = format!(
+            "<p>Hi {},</p><p>{}</p><p>— {} via Bendre</p>",
+            lead_name, body_text, therapist_display_name
+        );
+
+        let params = EmailParams {
+            to: lead_email,
+            reply_to: None,
+            from_name: &format!("{} via Bendre", therapist_display_name),
+            subject: &subject,
+            html: &html,
+        };
+
+        if let Err(e) = send_email(&self.resend_api_key, params).await {
+            tracing::warn!("Failed to send intake form email to lead {}: {}", lead_id, e);
+            // Return error — this is a deliberate user action, not a best-effort notification
+            return Err(EngagementError::BroadcastFailed(e));
+        }
+
+        Ok(SendLeadIntakeResponse {
+            submission_id: submission.id,
+            access_token: submission.access_token,
+            sent_at: submission.sent_at,
+        })
+    }
+
+    /// Public: get the intake form for a lead by access token.
+    /// Returns 410 Gone (via error) if already submitted.
+    pub async fn get_public_form(
+        &self,
+        token: &str,
+    ) -> Result<PublicLeadIntakeFormData, EngagementError> {
+        let submission = self.submission_repo
+            .find_by_token(token)
+            .await?
+            .ok_or(EngagementError::IntakeResponseNotFound)?;
+
+        if submission.submitted_at.is_some() {
+            return Err(EngagementError::AlreadySubmitted);
+        }
+
+        // Fetch questions for this therapist
+        let questions = self.question_repo
+            .list_by_therapist(submission.therapist_id)
+            .await?;
+
+        Ok(PublicLeadIntakeFormData {
+            submission_id: submission.id,
+            therapist_id: submission.therapist_id,
+            lead_id: submission.lead_id,
+            questions,
+        })
+    }
+
+    /// Public: submit intake form responses.
+    pub async fn submit_public_form(
+        &self,
+        token: &str,
+        responses: &serde_json::Value,
+    ) -> Result<LeadIntakeSubmission, EngagementError> {
+        // Verify token and check not already submitted
+        let submission = self.submission_repo
+            .find_by_token(token)
+            .await?
+            .ok_or(EngagementError::IntakeResponseNotFound)?;
+
+        if submission.submitted_at.is_some() {
+            return Err(EngagementError::AlreadySubmitted);
+        }
+
+        self.submission_repo.submit(token, responses).await
+    }
+
+    /// Authenticated: list all intake submissions for a lead.
+    pub async fn list_by_lead(
+        &self,
+        lead_id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<Vec<LeadIntakeSubmission>, EngagementError> {
+        self.submission_repo.list_by_lead(lead_id, therapist_id).await
+    }
+}
+
+/// Intermediate struct for building the public form response.
+pub struct PublicLeadIntakeFormData {
+    pub submission_id: Uuid,
+    pub therapist_id: Uuid,
+    pub lead_id: Uuid,
+    pub questions: Vec<IntakeFormQuestion>,
 }
 
 // ─── Broadcast Service ──────────────────────────────────────────────────────

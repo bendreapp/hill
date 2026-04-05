@@ -172,6 +172,35 @@ pub trait MessageTemplateRepository: Send + Sync {
     ) -> Result<MessageTemplate, EngagementError>;
 }
 
+// ─── Lead Intake Submission Repository ──────────────────────────────────────
+
+#[async_trait]
+pub trait LeadIntakeSubmissionRepository: Send + Sync {
+    async fn create(
+        &self,
+        lead_id: uuid::Uuid,
+        therapist_id: uuid::Uuid,
+        access_token: &str,
+    ) -> Result<super::entity::LeadIntakeSubmission, EngagementError>;
+
+    async fn find_by_token(
+        &self,
+        token: &str,
+    ) -> Result<Option<super::entity::LeadIntakeSubmission>, EngagementError>;
+
+    async fn list_by_lead(
+        &self,
+        lead_id: uuid::Uuid,
+        therapist_id: uuid::Uuid,
+    ) -> Result<Vec<super::entity::LeadIntakeSubmission>, EngagementError>;
+
+    async fn submit(
+        &self,
+        token: &str,
+        responses: &serde_json::Value,
+    ) -> Result<super::entity::LeadIntakeSubmission, EngagementError>;
+}
+
 // ─── Broadcast Port ─────────────────────────────────────────────────────────
 
 #[async_trait]

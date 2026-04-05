@@ -26,6 +26,9 @@ pub enum EngagementError {
     #[error("Encryption failed: {0}")]
     EncryptionFailed(String),
 
+    #[error("This intake form has already been submitted")]
+    AlreadySubmitted,
+
     #[error("Database error: {0}")]
     Database(String),
 }
@@ -43,6 +46,7 @@ impl From<EngagementError> for AppError {
             EngagementError::IntakeQuestionNotFound => {
                 AppError::not_found("Intake form question not found")
             }
+            EngagementError::AlreadySubmitted => AppError::Conflict { message: "This intake form has already been submitted".to_string() },
             EngagementError::BroadcastFailed(msg) => AppError::Integration { message: msg },
             EngagementError::EncryptionFailed(msg) => AppError::Encryption { message: msg },
             EngagementError::Database(msg) => AppError::Database { message: msg },
