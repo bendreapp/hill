@@ -76,11 +76,12 @@ impl BroadcastPort for HttpBroadcastAdapter {
         subject: &str,
         body: &str,
     ) -> Result<(), EngagementError> {
+        let wrapped = crate::shared::email::wrap_html(body);
         let payload = serde_json::json!({
             "from": self.email_from,
             "to": [to],
             "subject": subject,
-            "html": body,
+            "html": wrapped,
         });
 
         let response = self

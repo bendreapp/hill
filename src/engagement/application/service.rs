@@ -258,22 +258,22 @@ const DEFAULTS: &[DefaultTemplate] = &[
     DefaultTemplate {
         key: "inquiry_ack",
         subject: "Thanks for reaching out",
-        body: "Hi {client_name}, thanks for reaching out. I'll review your message and get back to you shortly.",
+        body: "Hi {client_name},\n\nThank you for reaching out. I've received your inquiry and I'll review it carefully.\n\nI'll get back to you within 24 hours to discuss next steps. If your message is time-sensitive, feel free to reach out to me directly.\n\nWarmly,\n{therapist_name}",
     },
     DefaultTemplate {
         key: "intake_invite",
-        subject: "Please fill out my intake form",
-        body: "Hi {client_name}, please fill out this intake form so I can understand your needs better: {intake_link}",
+        subject: "A quick form before we connect",
+        body: "Hi {client_name},\n\nBefore we connect, I'd love to learn a little more about you. Please take a few minutes to fill out this short intake form:\n\n{intake_link}\n\nThis helps me prepare thoughtfully for our conversation. It should take about 5 minutes.\n\nLooking forward to connecting with you.\n\nWarmly,\n{therapist_name}",
     },
     DefaultTemplate {
         key: "portal_invite",
-        subject: "Welcome — set up your client portal",
-        body: "Hi {client_name}, welcome aboard! Set up your client portal here: {portal_link}",
+        subject: "Welcome — your client portal is ready",
+        body: "Hi {client_name},\n\nWelcome aboard. I'm really glad we're going to be working together.\n\nI've set up your client portal where you can view sessions, access resources, and stay connected between our meetings. Set up your account here:\n\n{portal_link}\n\nIf you have any questions, just reply to this email.\n\nWarmly,\n{therapist_name}",
     },
     DefaultTemplate {
         key: "rejection",
-        subject: "Re: Your inquiry",
-        body: "Hi {client_name}, thank you for reaching out. After reviewing your inquiry, I don't think I'm the right fit for your needs at this time. I wish you the best.",
+        subject: "Re: your inquiry",
+        body: "Hi {client_name},\n\nThank you for reaching out to me. I've taken time to review your inquiry carefully.\n\nAfter consideration, I don't think I'm the right fit for what you're looking for at this moment. This isn't a reflection on you — it's about making sure you get the care that best matches your needs.\n\nI wish you well on your journey.\n\nWarmly,\n{therapist_name}",
     },
 ];
 
