@@ -17,7 +17,9 @@ pub async fn send_email(api_key: &str, params: EmailParams<'_>) -> Result<(), St
         return Err("RESEND_API_KEY not configured".to_string());
     }
 
-    let from = format!("{} <noreply@bendre.app>", params.from_name);
+    let from_domain = std::env::var("EMAIL_FROM_DOMAIN")
+        .unwrap_or_else(|_| "onboarding@resend.dev".to_string());
+    let from = format!("{} <{}>", params.from_name, from_domain);
 
     let mut payload = serde_json::json!({
         "from": from,
