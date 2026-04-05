@@ -1,7 +1,11 @@
 use std::sync::Arc;
 use uuid::Uuid;
 
-use crate::clients::domain::entity::*;
+use crate::clients::domain::entity::{
+    Client, ClientPortalProfile, ClientSessionType, CreateClientInput,
+    CreateClientSessionTypeInput, PortalSession, UpdateClientInput,
+    UpdateClientSessionTypeInput,
+};
 use crate::clients::domain::error::ClientError;
 use crate::clients::domain::port::*;
 
@@ -106,6 +110,68 @@ impl ClientService {
 
     pub async fn count_active(&self, therapist_id: Uuid) -> Result<i64, ClientError> {
         self.client_repo.count_active(therapist_id).await
+    }
+}
+
+// ─── Client Session Type Service ────────────────────────────────────────────
+
+pub struct ClientSessionTypeService {
+    pub repo: Arc<dyn crate::clients::domain::port::ClientSessionTypeRepository>,
+}
+
+impl ClientSessionTypeService {
+    pub fn new(repo: Arc<dyn crate::clients::domain::port::ClientSessionTypeRepository>) -> Self {
+        Self { repo }
+    }
+
+    pub async fn list_for_client(
+        &self,
+        client_id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<Vec<ClientSessionType>, ClientError> {
+        self.repo.list_by_client(client_id, therapist_id).await
+    }
+
+    pub async fn create_for_client(
+        &self,
+        client_id: Uuid,
+        therapist_id: Uuid,
+        input: &CreateClientSessionTypeInput,
+    ) -> Result<ClientSessionType, ClientError> {
+        self.repo.create(therapist_id, client_id, input).await
+    }
+
+    pub async fn update_for_client(
+        &self,
+        id: Uuid,
+        client_id: Uuid,
+        therapist_id: Uuid,
+        input: &UpdateClientSessionTypeInput,
+    ) -> Result<ClientSessionType, ClientError> {
+        self.repo
+            .find_by_id(id, client_id, therapist_id)
+            .await?
+            .ok_or(ClientError::ClientNotFound)?;
+
+        self.repo.update(id, client_id, therapist_id, input).await
+    }
+
+    pub async fn delete_for_client(
+        &self,
+        id: Uuid,
+        client_id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<(), ClientError> {
+        self.repo.delete(id, client_id, therapist_id).await
+    }
+
+    pub async fn set_default(
+        &self,
+        id: Uuid,
+        client_id: Uuid,
+        therapist_id: Uuid,
+    ) -> Result<(), ClientError> {
+        self.repo.set_default(id, client_id, therapist_id).await
     }
 }
 

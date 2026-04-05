@@ -27,6 +27,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at
             FROM clients
             WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
@@ -53,6 +54,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at
             FROM clients
             WHERE therapist_id = ANY($1)
@@ -107,6 +109,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at"
         )
         .bind(therapist_id)
@@ -140,8 +143,9 @@ impl ClientRepository for PgClientRepository {
                 intake_completed = COALESCE($8, intake_completed),
                 client_type = COALESCE($9::client_type, client_type),
                 category = COALESCE($10::client_category, category),
+                labels = COALESCE($11, labels),
                 updated_at = now()
-            WHERE id = $1 AND therapist_id = $11 AND deleted_at IS NULL
+            WHERE id = $1 AND therapist_id = $12 AND deleted_at IS NULL
             RETURNING
                 id, therapist_id, user_id, full_name, email, phone,
                 date_of_birth, emergency_contact, notes_private,
@@ -149,6 +153,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at"
         )
         .bind(id)
@@ -161,6 +166,7 @@ impl ClientRepository for PgClientRepository {
         .bind(&input.intake_completed)
         .bind(&input.client_type)
         .bind(&input.category)
+        .bind(&input.labels)
         .bind(therapist_id)
         .fetch_one(&self.pool)
         .await
@@ -189,6 +195,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at"
         )
         .bind(id)
@@ -212,6 +219,7 @@ impl ClientRepository for PgClientRepository {
                 status::text as status,
                 client_type::text as client_type,
                 category::text as category,
+                labels,
                 deleted_at, created_at, updated_at
             FROM clients
             WHERE therapist_id = $1 AND email = $2 AND deleted_at IS NULL"

@@ -2,8 +2,11 @@ use actix_web::{web, HttpResponse};
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::clients::application::service::{ClientPortalService, ClientService};
-use crate::clients::domain::entity::{CreateClientInput, UpdateClientInput, UpdateStatusInput};
+use crate::clients::application::service::{ClientPortalService, ClientService, ClientSessionTypeService};
+use crate::clients::domain::entity::{
+    CreateClientInput, CreateClientSessionTypeInput, UpdateClientInput, UpdateClientSessionTypeInput,
+    UpdateStatusInput,
+};
 use crate::shared::error::AppError;
 use crate::shared::types::{AuthUser, Paginated};
 
@@ -107,6 +110,75 @@ pub async fn count_active_clients(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "count": count })))
 }
 
+// ─── Client Session Type Handlers ───────────────────────────────────────────
+
+#[derive(Debug, serde::Deserialize)]
+pub struct ClientSessionTypePath {
+    pub client_id: Uuid,
+    pub id: Uuid,
+}
+
+pub async fn list_client_session_types(
+    user: AuthUser,
+    svc: web::Data<ClientSessionTypeService>,
+    client_svc: web::Data<ClientService>,
+    client_id: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    // Verify the client belongs to this therapist
+    client_svc.get_client(*client_id, user.id).await?;
+    let types = svc.list_for_client(*client_id, user.id).await?;
+    Ok(HttpResponse::Ok().json(types))
+}
+
+pub async fn create_client_session_type(
+    user: AuthUser,
+    svc: web::Data<ClientSessionTypeService>,
+    client_svc: web::Data<ClientService>,
+    client_id: web::Path<Uuid>,
+    body: web::Json<CreateClientSessionTypeInput>,
+) -> Result<HttpResponse, AppError> {
+    client_svc.get_client(*client_id, user.id).await?;
+    let session_type = svc.create_for_client(*client_id, user.id, &body).await?;
+    Ok(HttpResponse::Created().json(session_type))
+}
+
+pub async fn update_client_session_type(
+    user: AuthUser,
+    svc: web::Data<ClientSessionTypeService>,
+    client_svc: web::Data<ClientService>,
+    path: web::Path<ClientSessionTypePath>,
+    body: web::Json<UpdateClientSessionTypeInput>,
+) -> Result<HttpResponse, AppError> {
+    client_svc.get_client(path.client_id, user.id).await?;
+    let session_type = svc
+        .update_for_client(path.id, path.client_id, user.id, &body)
+        .await?;
+    Ok(HttpResponse::Ok().json(session_type))
+}
+
+pub async fn delete_client_session_type(
+    user: AuthUser,
+    svc: web::Data<ClientSessionTypeService>,
+    client_svc: web::Data<ClientService>,
+    path: web::Path<ClientSessionTypePath>,
+) -> Result<HttpResponse, AppError> {
+    client_svc.get_client(path.client_id, user.id).await?;
+    svc.delete_for_client(path.id, path.client_id, user.id)
+        .await?;
+    Ok(HttpResponse::NoContent().finish())
+}
+
+pub async fn set_default_client_session_type(
+    user: AuthUser,
+    svc: web::Data<ClientSessionTypeService>,
+    client_svc: web::Data<ClientService>,
+    path: web::Path<ClientSessionTypePath>,
+) -> Result<HttpResponse, AppError> {
+    client_svc.get_client(path.client_id, user.id).await?;
+    svc.set_default(path.id, path.client_id, user.id).await?;
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "success": true })))
+}
+
 // ─── Client Portal Handlers ────────────────────────────────────────────────
 
 pub async fn portal_list_profiles(
@@ -205,6 +277,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/api/v1/clients/{id}", web::put().to(update_client))
             .route("/api/v1/clients/{id}", web::delete().to(delete_client))
             .route("/api/v1/clients/{id}/status", web::patch().to(update_client_status))
+            // Client-specific session types
+            .route("/api/v1/clients/{client_id}/session-types", web::get().to(list_client_session_types))
+            .route("/api/v1/clients/{client_id}/session-types", web::post().to(create_client_session_type))
+            .route("/api/v1/clients/{client_id}/session-types/{id}", web::put().to(update_client_session_type))
+            .route("/api/v1/clients/{client_id}/session-types/{id}", web::delete().to(delete_client_session_type))
+            .route("/api/v1/clients/{client_id}/session-types/{id}/set-default", web::post().to(set_default_client_session_type))
             // Client portal
             .route("/api/v1/portal/profiles", web::get().to(portal_list_profiles))
             .route("/api/v1/portal/profiles/{client_id}", web::get().to(portal_get_profile))

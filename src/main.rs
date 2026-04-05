@@ -71,6 +71,7 @@ async fn main() -> std::io::Result<()> {
     let session_type_svc = web::Data::new(services.session_type_service);
     let client_svc = web::Data::new(services.client_service);
     let client_portal_svc = web::Data::new(services.client_portal_service);
+    let client_session_type_svc = web::Data::new(services.client_session_type_service);
     let note_svc = web::Data::new(services.note_service);
     let treatment_plan_svc = web::Data::new(services.treatment_plan_service);
     let message_svc = web::Data::new(services.message_service);
@@ -121,6 +122,7 @@ async fn main() -> std::io::Result<()> {
             // Client services
             .app_data(client_svc.clone())
             .app_data(client_portal_svc.clone())
+            .app_data(client_session_type_svc.clone())
             // Clinical services
             .app_data(note_svc.clone())
             .app_data(treatment_plan_svc.clone())

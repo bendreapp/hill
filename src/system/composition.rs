@@ -23,8 +23,9 @@ use crate::scheduling::infra::recurring_repo::PgRecurringReservationRepository;
 use crate::scheduling::infra::session_type_repo::PgSessionTypeRepository;
 
 // ─── Clients ─────────────────────────────────────────────────────────────────
-use crate::clients::application::service::{ClientService, ClientPortalService};
+use crate::clients::application::service::{ClientService, ClientPortalService, ClientSessionTypeService};
 use crate::clients::infra::client_repo::PgClientRepository;
+use crate::clients::infra::client_session_type_repo::PgClientSessionTypeRepository;
 use crate::clients::infra::portal_repo::PgClientPortalRepository;
 
 // ─── Clinical ────────────────────────────────────────────────────────────────
@@ -75,6 +76,7 @@ pub struct AppServices {
     // Clients
     pub client_service: ClientService,
     pub client_portal_service: ClientPortalService,
+    pub client_session_type_service: ClientSessionTypeService,
 
     // Clinical
     pub note_service: NoteService,
@@ -150,9 +152,12 @@ impl AppServices {
         // ── Clients ──────────────────────────────────────────────────────
         let client_repo = Arc::new(PgClientRepository::new(pool.clone()));
         let portal_repo = Arc::new(PgClientPortalRepository::new(pool.clone()));
+        let client_session_type_repo: Arc<dyn crate::clients::domain::port::ClientSessionTypeRepository> =
+            Arc::new(PgClientSessionTypeRepository::new(pool.clone()));
 
         let client_service = ClientService::new(client_repo.clone());
         let client_portal_service = ClientPortalService::new(portal_repo.clone());
+        let client_session_type_service = ClientSessionTypeService::new(client_session_type_repo);
 
         // ── Clinical ─────────────────────────────────────────────────────
         let note_repo = Arc::new(PgNoteRepository::new(pool.clone()));
@@ -178,12 +183,14 @@ impl AppServices {
         // ── Engagement ───────────────────────────────────────────────────
         let resource_repo = Arc::new(PgResourceRepository::new(pool.clone()));
         let intake_repo = Arc::new(PgIntakeFormRepository::new(pool.clone()));
+        let email_from = std::env::var("EMAIL_FROM_DOMAIN")
+            .unwrap_or_else(|_| "onboarding@resend.dev".to_string());
         let broadcast_port: Arc<dyn crate::engagement::domain::port::BroadcastPort> =
             Arc::new(HttpBroadcastAdapter::new(
                 config.gupshup_api_key.clone().unwrap_or_default(),
                 config.gupshup_app_name.clone().unwrap_or_default(),
                 config.resend_api_key.clone().unwrap_or_default(),
-                "noreply@bendre.app".to_string(),
+                email_from,
             ));
         let engagement_encryption: Arc<dyn crate::engagement::domain::port::EngagementEncryptionPort> =
             Arc::new(EngagementEncryptionAdapter::new(encryption.clone()));
@@ -243,6 +250,7 @@ impl AppServices {
             session_type_service,
             client_service,
             client_portal_service,
+            client_session_type_service,
             note_service,
             treatment_plan_service,
             message_service,
