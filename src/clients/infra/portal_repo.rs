@@ -44,17 +44,22 @@ impl ClientPortalRepository for PgClientPortalRepository {
     ) -> Result<Vec<PortalSession>, ClientError> {
         sqlx::query_as::<_, PortalSession>(
             "SELECT
-                id,
-                starts_at,
-                ends_at,
-                duration_mins,
-                status::text as status
-            FROM sessions
-            WHERE client_id = $1
-              AND starts_at > now()
-              AND status::text = 'scheduled'
-              AND deleted_at IS NULL
-            ORDER BY starts_at ASC
+                s.id,
+                s.starts_at,
+                s.ends_at,
+                s.duration_mins,
+                s.status::text as status,
+                st.name as session_type_name,
+                COALESCE(t.display_name, t.full_name) as therapist_name,
+                st.rate_inr as amount_inr
+            FROM sessions s
+            LEFT JOIN session_types st ON s.session_type_id = st.id
+            JOIN therapists t ON s.therapist_id = t.id
+            WHERE s.client_id = $1
+              AND s.starts_at > now()
+              AND s.status::text = 'scheduled'
+              AND s.deleted_at IS NULL
+            ORDER BY s.starts_at ASC
             LIMIT $2"
         )
         .bind(client_id)
@@ -72,16 +77,21 @@ impl ClientPortalRepository for PgClientPortalRepository {
     ) -> Result<(Vec<PortalSession>, i64), ClientError> {
         let rows = sqlx::query_as::<_, PortalSession>(
             "SELECT
-                id,
-                starts_at,
-                ends_at,
-                duration_mins,
-                status::text as status
-            FROM sessions
-            WHERE client_id = $1
-              AND (starts_at <= now() OR status::text != 'scheduled')
-              AND deleted_at IS NULL
-            ORDER BY starts_at DESC
+                s.id,
+                s.starts_at,
+                s.ends_at,
+                s.duration_mins,
+                s.status::text as status,
+                st.name as session_type_name,
+                COALESCE(t.display_name, t.full_name) as therapist_name,
+                st.rate_inr as amount_inr
+            FROM sessions s
+            LEFT JOIN session_types st ON s.session_type_id = st.id
+            JOIN therapists t ON s.therapist_id = t.id
+            WHERE s.client_id = $1
+              AND (s.starts_at <= now() OR s.status::text != 'scheduled')
+              AND s.deleted_at IS NULL
+            ORDER BY s.starts_at DESC
             LIMIT $2 OFFSET $3"
         )
         .bind(client_id)

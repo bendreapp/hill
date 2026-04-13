@@ -111,6 +111,12 @@ impl ClientService {
     pub async fn count_active(&self, therapist_id: Uuid) -> Result<i64, ClientError> {
         self.client_repo.count_active(therapist_id).await
     }
+
+    /// Link a Supabase auth user_id to a client record.
+    /// Called after a client claims their portal invitation and creates a Supabase account.
+    pub async fn link_user_id(&self, client_id: Uuid, user_id: Uuid) -> Result<(), ClientError> {
+        self.client_repo.link_user_id(client_id, user_id).await
+    }
 }
 
 // ─── Client Session Type Service ────────────────────────────────────────────

@@ -61,6 +61,24 @@ pub struct ClientInvitation {
     pub created_at: DateTime<Utc>,
 }
 
+/// Enriched invitation view for the portal claim page.
+/// Returned by the public `GET /api/v1/client-invitations/by-token/{token}/detail` endpoint.
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+pub struct ClientInvitationDetail {
+    pub id: Uuid,
+    pub token: String,
+    pub status: String,
+    pub expires_at: DateTime<Utc>,
+    pub claimed_at: Option<DateTime<Utc>>,
+    /// Pre-filled from the client record
+    pub client_full_name: String,
+    pub client_email: Option<String>,
+    /// Therapist info to show on the claim page
+    pub therapist_name: String,
+    pub therapist_avatar_url: Option<String>,
+    pub therapist_slug: String,
+}
+
 // ─── Convert Lead to Client Response ───────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

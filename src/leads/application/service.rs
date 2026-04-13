@@ -273,7 +273,7 @@ impl ClientInvitationService {
             .await?;
 
         // Send the portal invite email
-        let portal_url = format!("{}/portal/claim/{}", self.frontend_url, invitation.token);
+        let portal_url = format!("{}/onboard/{}", self.frontend_url, invitation.token);
         let html = format!(
             "<p>Hi {},</p>\
              <p><strong>{}</strong> has invited you to access your client portal on Bendre.</p>\
@@ -322,6 +322,30 @@ impl ClientInvitationService {
             return Err(LeadsError::InvitationExpired);
         }
         Ok(invitation)
+    }
+
+    /// Returns enriched invitation details (client name/email, therapist name/avatar).
+    /// Does NOT validate status — allows showing a "claimed" or "expired" state on the page.
+    pub async fn get_detail_by_token(&self, token: &str) -> Result<serde_json::Value, LeadsError> {
+        let detail = self
+            .invitation_repo
+            .find_detail_by_token(token)
+            .await?
+            .ok_or(LeadsError::InvitationNotFound)?;
+
+        let is_usable = detail.status == "pending" && detail.claimed_at.is_none();
+        Ok(serde_json::json!({
+            "id": detail.id,
+            "token": detail.token,
+            "status": detail.status,
+            "is_usable": is_usable,
+            "expires_at": detail.expires_at,
+            "client_full_name": detail.client_full_name,
+            "client_email": detail.client_email,
+            "therapist_name": detail.therapist_name,
+            "therapist_avatar_url": detail.therapist_avatar_url,
+            "therapist_slug": detail.therapist_slug,
+        }))
     }
 
     pub async fn claim(&self, token: &str) -> Result<ClientInvitation, LeadsError> {

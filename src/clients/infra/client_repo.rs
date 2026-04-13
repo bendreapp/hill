@@ -246,4 +246,16 @@ impl ClientRepository for PgClientRepository {
 
         Ok(count)
     }
+
+    async fn link_user_id(&self, client_id: Uuid, user_id: Uuid) -> Result<(), ClientError> {
+        sqlx::query(
+            "UPDATE clients SET user_id = $1 WHERE id = $2 AND deleted_at IS NULL"
+        )
+        .bind(user_id)
+        .bind(client_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ClientError::Database(e.to_string()))?;
+        Ok(())
+    }
 }

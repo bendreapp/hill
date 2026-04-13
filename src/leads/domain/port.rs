@@ -39,6 +39,8 @@ impl TherapistInfo {
 pub trait ClientInvitationRepository: Send + Sync {
     async fn create(&self, therapist_id: Uuid, client_id: Uuid, email: Option<&str>, phone: Option<&str>) -> Result<ClientInvitation, LeadsError>;
     async fn find_by_token(&self, token: &str) -> Result<Option<ClientInvitation>, LeadsError>;
+    /// Returns enriched invitation with client + therapist details (for the portal claim page).
+    async fn find_detail_by_token(&self, token: &str) -> Result<Option<ClientInvitationDetail>, LeadsError>;
     async fn find_by_client(&self, client_id: Uuid) -> Result<Option<ClientInvitation>, LeadsError>;
     async fn claim(&self, token: &str) -> Result<ClientInvitation, LeadsError>;
     /// Mark the invitation as having had its email sent (sets invite_sent_at = now())

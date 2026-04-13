@@ -43,6 +43,9 @@ pub trait ClientRepository: Send + Sync {
     ) -> Result<Option<Client>, ClientError>;
 
     async fn count_active(&self, therapist_id: Uuid) -> Result<i64, ClientError>;
+
+    /// Link a Supabase auth user_id to a client record (called during portal claim).
+    async fn link_user_id(&self, client_id: Uuid, user_id: Uuid) -> Result<(), ClientError>;
 }
 
 #[async_trait]

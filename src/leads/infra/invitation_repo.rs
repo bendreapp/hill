@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 use crate::leads::domain::entity::*;
 use crate::leads::domain::error::LeadsError;
-use crate::leads::domain::port::{ClientInvitationRepository};
+use crate::leads::domain::port::ClientInvitationRepository;
 
 pub struct PgClientInvitationRepository {
     pool: PgPool,
@@ -43,6 +43,30 @@ impl ClientInvitationRepository for PgClientInvitationRepository {
         let row = sqlx::query_as::<_, ClientInvitation>(
             "SELECT id, therapist_id, client_id, token, email, phone, status, expires_at, claimed_at, invite_sent_at, created_at
              FROM client_invitations WHERE token = $1"
+        )
+        .bind(token)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    async fn find_detail_by_token(&self, token: &str) -> Result<Option<ClientInvitationDetail>, LeadsError> {
+        let row = sqlx::query_as::<_, ClientInvitationDetail>(
+            "SELECT
+                ci.id,
+                ci.token,
+                ci.status,
+                ci.expires_at,
+                ci.claimed_at,
+                c.full_name as client_full_name,
+                c.email as client_email,
+                COALESCE(t.display_name, t.full_name) as therapist_name,
+                t.avatar_url as therapist_avatar_url,
+                t.slug as therapist_slug
+            FROM client_invitations ci
+            JOIN clients c ON ci.client_id = c.id
+            JOIN therapists t ON ci.therapist_id = t.id
+            WHERE ci.token = $1"
         )
         .bind(token)
         .fetch_optional(&self.pool)

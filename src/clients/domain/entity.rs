@@ -115,4 +115,7 @@ pub struct PortalSession {
     pub ends_at: DateTime<Utc>,
     pub duration_mins: i32,
     pub status: String,
+    pub session_type_name: Option<String>,
+    pub therapist_name: String,
+    pub amount_inr: Option<i32>,
 }

@@ -9,6 +9,13 @@ use crate::leads::domain::entity::{CreateLeadInput, UpdateLeadInput};
 use crate::shared::error::AppError;
 use crate::shared::types::AuthUser;
 
+#[derive(Debug, Deserialize)]
+pub struct ClaimInvitationBody {
+    /// The Supabase auth user_id of the newly signed-up client.
+    /// When provided, the client row is linked so the portal can find their profile.
+    pub user_id: Option<Uuid>,
+}
+
 // ─── Query Parameters ──────────────────────────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -180,12 +187,38 @@ pub async fn get_invitation_by_token(
 }
 
 /// Public — claim invitation (client sets up account)
+/// Optionally accepts a user_id in the body to link the Supabase user to the client record.
+/// Body is optional — if omitted or empty, the invitation is still claimed without linking.
 pub async fn claim_invitation(
+    token: web::Path<String>,
+    client_svc: web::Data<ClientService>,
+    svc: web::Data<ClientInvitationService>,
+    body: Option<web::Json<ClaimInvitationBody>>,
+) -> Result<HttpResponse, AppError> {
+    let invitation = svc.claim(&token).await?;
+
+    // Link the client record to the Supabase user so portal queries work
+    if let Some(b) = body {
+        if let Some(user_id) = b.into_inner().user_id {
+            if let Err(e) = client_svc.link_user_id(invitation.client_id, user_id).await {
+                tracing::warn!(
+                    "Failed to link user_id {} to client {}: {}",
+                    user_id, invitation.client_id, e
+                );
+            }
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(invitation))
+}
+
+/// Public — get enriched invitation detail (client + therapist info) for portal claim page
+pub async fn get_invitation_detail_by_token(
     token: web::Path<String>,
     svc: web::Data<ClientInvitationService>,
 ) -> Result<HttpResponse, AppError> {
-    let invitation = svc.claim(&token).await?;
-    Ok(HttpResponse::Ok().json(invitation))
+    let detail = svc.get_detail_by_token(&token).await?;
+    Ok(HttpResponse::Ok().json(detail))
 }
 
 // ─── Route Configuration ────────────────────────────────────────────────────
@@ -206,5 +239,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .route("/api/v1/client-invitations/send", web::post().to(send_portal_invite))
         // Client invitations (public — for claiming)
         .route("/api/v1/client-invitations/by-token/{token}", web::get().to(get_invitation_by_token))
+        .route("/api/v1/client-invitations/by-token/{token}/detail", web::get().to(get_invitation_detail_by_token))
         .route("/api/v1/client-invitations/by-token/{token}/claim", web::post().to(claim_invitation));
 }
