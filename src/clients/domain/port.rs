@@ -1,9 +1,10 @@
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use super::entity::{
     Client, ClientPortalProfile, ClientSessionType, CreateClientSessionTypeInput,
-    PortalSession, UpdateClientSessionTypeInput,
+    PortalInvoice, PortalSession, UpdateClientSessionTypeInput, UpdatePortalProfileInput,
 };
 use super::error::ClientError;
 
@@ -101,6 +102,13 @@ pub trait ClientPortalRepository: Send + Sync {
         user_id: Uuid,
     ) -> Result<Vec<ClientPortalProfile>, ClientError>;
 
+    async fn update_profile(
+        &self,
+        client_id: Uuid,
+        user_id: Uuid,
+        input: &UpdatePortalProfileInput,
+    ) -> Result<ClientPortalProfile, ClientError>;
+
     async fn upcoming_sessions(
         &self,
         client_id: Uuid,
@@ -113,4 +121,65 @@ pub trait ClientPortalRepository: Send + Sync {
         limit: i64,
         offset: i64,
     ) -> Result<(Vec<PortalSession>, i64), ClientError>;
+
+    async fn list_invoices(
+        &self,
+        client_id: Uuid,
+    ) -> Result<Vec<PortalInvoice>, ClientError>;
+
+    async fn request_reschedule(
+        &self,
+        session_id: Uuid,
+        client_id: Uuid,
+        requested_date: &str,
+        requested_time: &str,
+        reason: Option<&str>,
+    ) -> Result<(), ClientError>;
+
+    async fn find_session_by_id_for_client(
+        &self,
+        session_id: Uuid,
+        client_id: Uuid,
+    ) -> Result<Option<PortalSession>, ClientError>;
+
+    async fn list_intake_forms(
+        &self,
+        client_id: Uuid,
+    ) -> Result<Vec<serde_json::Value>, ClientError>;
+
+    async fn list_sessions_for_reminder(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<ReminderSession>, ClientError>;
+
+    async fn mark_reminder_sent(
+        &self,
+        session_id: Uuid,
+    ) -> Result<(), ClientError>;
+
+    async fn clear_reschedule_request(
+        &self,
+        session_id: Uuid,
+    ) -> Result<(), ClientError>;
+
+    async fn get_client_email_by_id(
+        &self,
+        client_id: Uuid,
+    ) -> Result<Option<String>, ClientError>;
+}
+
+/// Minimal session data needed to send reminders.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ReminderSession {
+    pub id: Uuid,
+    #[allow(dead_code)]
+    pub therapist_id: Uuid,
+    #[allow(dead_code)]
+    pub client_id: Uuid,
+    pub starts_at: DateTime<Utc>,
+    pub client_email: Option<String>,
+    pub client_name: String,
+    pub therapist_email: Option<String>,
+    pub therapist_name: String,
 }

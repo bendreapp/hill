@@ -32,11 +32,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE id = $1 AND therapist_id = $2 AND deleted_at IS NULL"
@@ -62,11 +64,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE therapist_id = $1
@@ -92,11 +96,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE therapist_id = $1
@@ -124,11 +130,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE therapist_id = $1
@@ -160,11 +168,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE therapist_id = $1
@@ -195,11 +205,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at
             FROM sessions
             WHERE therapist_id = $1 AND client_id = $2 AND deleted_at IS NULL
@@ -228,11 +240,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at"
         )
         .bind(session.id)
@@ -282,11 +296,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at"
         )
         .bind(id)
@@ -327,11 +343,13 @@ impl SessionRepository for PgSessionRepository {
                 zoom_meeting_id, zoom_join_url, zoom_start_url, google_event_id,
                 payment_status::text as payment_status,
                 amount_inr, razorpay_payment_id,
-                reminder_24h_sent, reminder_1h_sent,
+                reminder_24h_sent, reminder_1h_sent, reminder_sent_at,
                 session_number, cancellation_reason, cancelled_at,
                 cancelled_by::text as cancelled_by,
                 is_late_cancellation,
                 session_type_name, recurring_reservation_id,
+                reschedule_requested_at, reschedule_requested_date,
+                reschedule_requested_time, reschedule_reason,
                 deleted_at, created_at, updated_at"
         )
         .bind(session.id)

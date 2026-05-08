@@ -26,6 +26,7 @@ pub struct Session {
 
     pub reminder_24h_sent: bool,
     pub reminder_1h_sent: bool,
+    pub reminder_sent_at: Option<DateTime<Utc>>,
 
     pub session_number: Option<i32>,
     pub cancellation_reason: Option<String>,
@@ -35,6 +36,12 @@ pub struct Session {
 
     pub session_type_name: Option<String>,
     pub recurring_reservation_id: Option<Uuid>,
+
+    // Reschedule request fields (set by client portal)
+    pub reschedule_requested_at: Option<DateTime<Utc>>,
+    pub reschedule_requested_date: Option<String>,
+    pub reschedule_requested_time: Option<String>,
+    pub reschedule_reason: Option<String>,
 
     pub deleted_at: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,

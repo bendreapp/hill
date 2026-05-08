@@ -156,7 +156,10 @@ impl AppServices {
             Arc::new(PgClientSessionTypeRepository::new(pool.clone()));
 
         let client_service = ClientService::new(client_repo.clone());
-        let client_portal_service = ClientPortalService::new(portal_repo.clone());
+        let client_portal_service = ClientPortalService::new(
+            portal_repo.clone(),
+            config.resend_api_key.clone().unwrap_or_default(),
+        );
         let client_session_type_service = ClientSessionTypeService::new(client_session_type_repo);
 
         // ── Clinical ─────────────────────────────────────────────────────

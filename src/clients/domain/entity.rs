@@ -12,6 +12,8 @@ pub struct Client {
     pub phone: Option<String>,
     pub date_of_birth: Option<NaiveDate>,
     pub emergency_contact: Option<String>,
+    pub emergency_contact_name: Option<String>,
+    pub emergency_contact_phone: Option<String>,
     pub notes_private: Option<String>,
     pub intake_completed: bool,
     pub is_active: bool,
@@ -103,8 +105,49 @@ pub struct ClientPortalProfile {
     pub full_name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
+    pub emergency_contact_name: Option<String>,
+    pub emergency_contact_phone: Option<String>,
     pub intake_completed: bool,
     pub status: String,
+    // Therapist info (joined)
+    pub therapist_name: String,
+    pub therapist_avatar_url: Option<String>,
+}
+
+/// Input for the client portal profile update endpoint.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct UpdatePortalProfileInput {
+    pub phone: Option<String>,
+    pub emergency_contact_name: Option<String>,
+    pub emergency_contact_phone: Option<String>,
+}
+
+/// A portal invoice summary (subset of Invoice fields).
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow, utoipa::ToSchema)]
+pub struct PortalInvoice {
+    pub id: Uuid,
+    pub invoice_number: String,
+    pub amount_inr: i32,
+    pub gst_amount_inr: i32,
+    pub total_inr: i32,
+    pub status: String,
+    pub paid_at: Option<DateTime<Utc>>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Input for the client portal reschedule request.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct PortalRescheduleInput {
+    pub requested_date: String,
+    pub requested_time: String,
+    pub reason: Option<String>,
+}
+
+/// Input for therapist to approve a reschedule request.
+#[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]
+pub struct ApproveRescheduleInput {
+    pub starts_at: DateTime<Utc>,
+    pub ends_at: DateTime<Utc>,
 }
 
 /// A compact session view returned in the client portal.

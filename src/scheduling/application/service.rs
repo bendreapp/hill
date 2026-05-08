@@ -198,7 +198,10 @@ impl SessionService {
             return Err(SchedulingError::InvalidTimeRange);
         }
         let mut session = self.get_by_id(therapist_id, session_id).await?;
-        if session.status != "scheduled" && session.status != "pending_approval" {
+        if session.status != "scheduled"
+            && session.status != "pending_approval"
+            && session.status != "reschedule_requested"
+        {
             return Err(SchedulingError::InvalidStatus(format!(
                 "Cannot reschedule session with status '{}'",
                 session.status
@@ -207,6 +210,7 @@ impl SessionService {
         session.starts_at = new_starts_at;
         session.ends_at = new_ends_at;
         session.duration_mins = (new_ends_at - new_starts_at).num_minutes() as i32;
+        session.status = "scheduled".to_string();
         self.session_repo.update(&session).await
     }
 
@@ -242,6 +246,7 @@ impl SessionService {
             razorpay_payment_id: None,
             reminder_24h_sent: false,
             reminder_1h_sent: false,
+            reminder_sent_at: None,
             session_number: None,
             cancellation_reason: None,
             cancelled_at: None,
@@ -249,6 +254,10 @@ impl SessionService {
             is_late_cancellation: None,
             session_type_name,
             recurring_reservation_id,
+            reschedule_requested_at: None,
+            reschedule_requested_date: None,
+            reschedule_requested_time: None,
+            reschedule_reason: None,
             deleted_at: None,
             created_at: now,
             updated_at: now,
@@ -523,6 +532,7 @@ impl BookingService {
             razorpay_payment_id: None,
             reminder_24h_sent: false,
             reminder_1h_sent: false,
+            reminder_sent_at: None,
             session_number: None,
             cancellation_reason: None,
             cancelled_at: None,
@@ -530,6 +540,10 @@ impl BookingService {
             is_late_cancellation: None,
             session_type_name,
             recurring_reservation_id: None,
+            reschedule_requested_at: None,
+            reschedule_requested_date: None,
+            reschedule_requested_time: None,
+            reschedule_reason: None,
             deleted_at: None,
             created_at: now,
             updated_at: now,
@@ -573,6 +587,7 @@ impl BookingService {
                 razorpay_payment_id: None,
                 reminder_24h_sent: false,
                 reminder_1h_sent: false,
+                reminder_sent_at: None,
                 session_number: None,
                 cancellation_reason: None,
                 cancelled_at: None,
@@ -580,6 +595,10 @@ impl BookingService {
                 is_late_cancellation: None,
                 session_type_name: session_type_name.clone(),
                 recurring_reservation_id,
+                reschedule_requested_at: None,
+                reschedule_requested_date: None,
+                reschedule_requested_time: None,
+                reschedule_reason: None,
                 deleted_at: None,
                 created_at: now,
                 updated_at: now,
@@ -823,6 +842,7 @@ impl RecurringReservationService {
             razorpay_payment_id: None,
             reminder_24h_sent: false,
             reminder_1h_sent: false,
+            reminder_sent_at: None,
             session_number: None,
             cancellation_reason: None,
             cancelled_at: None,
@@ -830,6 +850,10 @@ impl RecurringReservationService {
             is_late_cancellation: None,
             session_type_name: reservation.session_type_name.clone(),
             recurring_reservation_id: Some(reservation.id),
+            reschedule_requested_at: None,
+            reschedule_requested_date: None,
+            reschedule_requested_time: None,
+            reschedule_reason: None,
             deleted_at: None,
             created_at: now,
             updated_at: now,

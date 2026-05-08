@@ -22,7 +22,8 @@ impl ClientRepository for PgClientRepository {
         sqlx::query_as::<_, Client>(
             "SELECT
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
@@ -49,7 +50,8 @@ impl ClientRepository for PgClientRepository {
         let rows = sqlx::query_as::<_, Client>(
             "SELECT
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
@@ -104,7 +106,8 @@ impl ClientRepository for PgClientRepository {
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8::client_type, $9::client_category)
             RETURNING
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
@@ -148,7 +151,8 @@ impl ClientRepository for PgClientRepository {
             WHERE id = $1 AND therapist_id = $12 AND deleted_at IS NULL
             RETURNING
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
@@ -190,7 +194,8 @@ impl ClientRepository for PgClientRepository {
             WHERE id = $1 AND therapist_id = $3 AND deleted_at IS NULL
             RETURNING
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
@@ -214,7 +219,8 @@ impl ClientRepository for PgClientRepository {
         sqlx::query_as::<_, Client>(
             "SELECT
                 id, therapist_id, user_id, full_name, email, phone,
-                date_of_birth, emergency_contact, notes_private,
+                date_of_birth, emergency_contact, emergency_contact_name, emergency_contact_phone,
+                notes_private,
                 intake_completed, is_active,
                 status::text as status,
                 client_type::text as client_type,
