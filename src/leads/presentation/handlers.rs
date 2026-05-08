@@ -117,6 +117,13 @@ pub async fn get_public_profile(
     Ok(HttpResponse::Ok().json(profile))
 }
 
+fn is_valid_email(email: &str) -> bool {
+    email.len() >= 5 && email.contains('@') && email.rfind('@').map_or(false, |i| {
+        let domain = &email[i + 1..];
+        domain.contains('.') && domain.len() >= 3
+    })
+}
+
 /// Public — POST /api/v1/booking/{slug}/inquire
 /// Creates a lead from the public booking page (no auth).
 /// Sends auto-ack email to lead and notifies therapist (best-effort).
@@ -125,6 +132,12 @@ pub async fn public_inquire(
     lead_svc: web::Data<LeadService>,
     body: web::Json<CreateLeadInput>,
 ) -> Result<HttpResponse, AppError> {
+    // Validate email format before creating the lead
+    if let Some(ref email) = body.email {
+        if !is_valid_email(email) {
+            return Err(AppError::bad_request("Invalid email address"));
+        }
+    }
     let lead = lead_svc.create_lead_by_slug(&slug, &body).await?;
     Ok(HttpResponse::Created().json(serde_json::json!({
         "success": true,
@@ -189,6 +202,10 @@ pub async fn get_invitation_by_token(
 /// Public — claim invitation (client sets up account)
 /// Optionally accepts a user_id in the body to link the Supabase user to the client record.
 /// Body is optional — if omitted or empty, the invitation is still claimed without linking.
+///
+/// TODO: Replace body `user_id` with JWT auth — the claiming client should be authenticated
+/// via Supabase JWT and their sub extracted server-side rather than trusting a client-supplied
+/// user_id. This removes the risk of a client claiming another user's identity.
 pub async fn claim_invitation(
     token: web::Path<String>,
     client_svc: web::Data<ClientService>,

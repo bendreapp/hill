@@ -11,6 +11,7 @@ use crate::engagement::domain::entity::{
 };
 use crate::leads::application::service::LeadService;
 use crate::iam::application::service::TherapistService;
+use crate::clients::application::service::ClientService;
 use crate::shared::error::AppError;
 use crate::shared::types::{AuthUser, Paginated};
 
@@ -313,19 +314,36 @@ pub async fn reorder_intake_questions(
 // ─── Broadcast Handler ──────────────────────────────────────────────────────
 
 pub async fn send_broadcast(
-    _user: AuthUser,
+    user: AuthUser,
     svc: web::Data<BroadcastService>,
+    client_svc: web::Data<ClientService>,
     body: web::Json<BroadcastInput>,
 ) -> Result<HttpResponse, AppError> {
-    // The handler receives client_ids; in a full implementation the handler would
-    // resolve each client_id to their contact info. Here we use client_ids as
-    // identifiers directly (phone or email depending on channel).
-    // For a real implementation, this would join against the clients table.
-    let contacts: Vec<(String, Option<String>)> = body
-        .client_ids
-        .iter()
-        .map(|id| (id.to_string(), None))
-        .collect();
+    // Resolve each client_id to actual contact info, enforcing therapist ownership.
+    let mut contacts: Vec<(String, Option<String>)> = Vec::new();
+    for client_id in &body.client_ids {
+        // find_by_id enforces therapist_id ownership — skips clients not belonging to this therapist
+        if let Ok(Some(client)) = client_svc.client_repo.find_by_id(*client_id, user.id).await {
+            let contact = match body.channel.as_str() {
+                "email" => client.email.clone(),
+                "whatsapp" | "sms" => client.phone.clone(),
+                _ => None,
+            };
+            if let Some(addr) = contact {
+                contacts.push((addr, Some(client.full_name.clone())));
+            } else {
+                tracing::warn!(
+                    "Client {} has no contact info for channel '{}' — skipping",
+                    client_id, body.channel
+                );
+            }
+        } else {
+            tracing::warn!(
+                "Client {} not found or not owned by therapist {} — skipping",
+                client_id, user.id
+            );
+        }
+    }
 
     let sent = svc.broadcast(&body, &contacts).await?;
     Ok(HttpResponse::Ok().json(serde_json::json!({ "sent": sent })))

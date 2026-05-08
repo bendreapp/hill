@@ -91,7 +91,19 @@ pub async fn update_me(
     if let Some(v) = updates.get("bio") { therapist.bio = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("qualifications") { therapist.qualifications = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("phone") { therapist.phone = v.as_str().map(|s| s.to_string()); }
-    if let Some(v) = updates.get("slug").and_then(|v| v.as_str()) { therapist.slug = v.to_string(); }
+    if let Some(v) = updates.get("slug").and_then(|v| v.as_str()) {
+        // Validate: 3–63 chars, starts with [a-z0-9], rest are [a-z0-9-]
+        let valid = v.len() >= 3
+            && v.len() <= 63
+            && v.chars().next().map_or(false, |c| c.is_ascii_alphanumeric())
+            && v.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
+        if !valid {
+            return Err(AppError::bad_request(
+                "Invalid slug: must be 3–63 characters, lowercase letters, digits, and hyphens only, and must start with a letter or digit"
+            ));
+        }
+        therapist.slug = v.to_string();
+    }
     if let Some(v) = updates.get("gstin") { therapist.gstin = v.as_str().map(|s| s.to_string()); }
     if let Some(v) = updates.get("booking_page_active").and_then(|v| v.as_bool()) { therapist.booking_page_active = v; }
     if let Some(v) = updates.get("show_pricing").and_then(|v| v.as_bool()) { therapist.show_pricing = v; }

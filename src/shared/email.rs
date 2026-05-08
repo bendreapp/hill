@@ -14,6 +14,12 @@ pub struct EmailParams<'a> {
 /// Plain text: split on \n\n into paragraphs, \n becomes <br>.
 /// Already-HTML content (starts with `<`): pass through.
 /// Adds Bendre header + footer.
+///
+/// # Security note
+/// HTML bodies are passed through without sanitization. This is intentional
+/// for therapist-controlled content (message templates, custom bodies), but
+/// MUST NOT be used with user-supplied content from clients or leads without
+/// prior sanitization.
 pub fn wrap_html(body: &str) -> String {
     let trimmed = body.trim();
     let body_html = if trimmed.starts_with('<') {

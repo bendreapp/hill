@@ -245,25 +245,9 @@ pub async fn portal_upcoming_count(
     Ok(HttpResponse::Ok().json(serde_json::json!({ "count": sessions.len() })))
 }
 
-pub async fn portal_invoices(
-    _user: AuthUser,
-    _client_id: web::Path<Uuid>,
-) -> Result<HttpResponse, AppError> {
-    // TODO: verify client ownership once billing is wired up
-    // Returns invoices for a client in the portal; delegates to billing feature via HTTP.
-    // Kept as a thin pass-through to avoid cross-feature imports.
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "data": [], "total": 0 })))
-}
-
-pub async fn portal_resources(
-    _user: AuthUser,
-    _client_id: web::Path<Uuid>,
-) -> Result<HttpResponse, AppError> {
-    // TODO: verify client ownership once engagement is wired up
-    // Returns shared resources for a client in the portal; delegates to engagement feature via HTTP.
-    // Kept as a thin pass-through to avoid cross-feature imports.
-    Ok(HttpResponse::Ok().json(serde_json::json!({ "data": [], "total": 0 })))
-}
+// C1 SECURITY: portal_invoices and portal_resources removed — they had no ownership
+// verification and would become IDOR vulnerabilities when billing/resources are wired.
+// Re-add with proper client ownership checks when those features are ready.
 
 // ─── Route Configuration ────────────────────────────────────────────────────
 
@@ -289,6 +273,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/api/v1/portal/profiles/{client_id}/sessions/upcoming", web::get().to(portal_upcoming_sessions))
             .route("/api/v1/portal/profiles/{client_id}/sessions/upcoming/count", web::get().to(portal_upcoming_count))
             .route("/api/v1/portal/profiles/{client_id}/sessions/past", web::get().to(portal_past_sessions))
-            .route("/api/v1/portal/profiles/{client_id}/invoices", web::get().to(portal_invoices))
-            .route("/api/v1/portal/profiles/{client_id}/resources", web::get().to(portal_resources));
+            // portal invoices + resources routes removed (C1 security) — re-add with ownership checks when wired
+            ;
 }
