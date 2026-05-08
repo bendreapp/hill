@@ -33,6 +33,7 @@ struct JwksResponse {
 
 #[derive(Debug, Deserialize)]
 struct JwkKey {
+    #[allow(dead_code)]
     alg: Option<String>,
     kid: Option<String>,
     kty: String,

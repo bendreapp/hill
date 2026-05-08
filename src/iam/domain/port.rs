@@ -33,6 +33,7 @@ pub trait AvailabilityRepository: Send + Sync {
 // ─── Practice Repository ─────────────────────────────────────────────────────
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait PracticeRepository: Send + Sync {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Practice>, IamError>;
     async fn find_by_owner(&self, owner_id: Uuid) -> Result<Option<Practice>, IamError>;
@@ -58,6 +59,7 @@ pub trait PracticeRepository: Send + Sync {
 // ─── Invitation Repository ───────────────────────────────────────────────────
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait InvitationRepository: Send + Sync {
     async fn create(
         &self,
@@ -76,6 +78,7 @@ pub trait InvitationRepository: Send + Sync {
 // ─── Onboarding Token Repository ─────────────────────────────────────────────
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait OnboardingTokenRepository: Send + Sync {
     async fn create(
         &self,

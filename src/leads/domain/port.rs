@@ -5,6 +5,7 @@ use super::entity::*;
 use super::error::LeadsError;
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait LeadRepository: Send + Sync {
     async fn create(&self, therapist_id: Uuid, input: &CreateLeadInput) -> Result<Lead, LeadsError>;
     async fn find_by_id(&self, id: Uuid, therapist_id: Uuid) -> Result<Option<Lead>, LeadsError>;

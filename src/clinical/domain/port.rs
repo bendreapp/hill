@@ -75,6 +75,7 @@ pub trait TreatmentPlanRepository: Send + Sync {
 // ─── Message Repository ─────────────────────────────────────────────────────
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait MessageRepository: Send + Sync {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Message>, ClinicalError>;
 

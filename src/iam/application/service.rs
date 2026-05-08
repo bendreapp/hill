@@ -144,11 +144,13 @@ impl TherapistService {
 
 // ─── Practice Service ────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct PracticeService {
     pub practice_repo: Arc<dyn PracticeRepository>,
     pub invitation_repo: Arc<dyn InvitationRepository>,
 }
 
+#[allow(dead_code)]
 impl PracticeService {
     pub fn new(
         practice_repo: Arc<dyn PracticeRepository>,
@@ -310,10 +312,12 @@ impl PracticeService {
 
 // ─── Onboarding Service ──────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct OnboardingService {
     pub token_repo: Arc<dyn OnboardingTokenRepository>,
 }
 
+#[allow(dead_code)]
 impl OnboardingService {
     pub fn new(token_repo: Arc<dyn OnboardingTokenRepository>) -> Self {
         Self { token_repo }

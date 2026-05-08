@@ -1,5 +1,6 @@
 /// Application configuration loaded from environment variables.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct AppConfig {
     // Server
     pub host: String,

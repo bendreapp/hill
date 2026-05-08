@@ -426,6 +426,7 @@ impl IntakeQuestionService {
 
 // ─── Lead Intake Service ─────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct LeadIntakeService {
     pub submission_repo: Arc<dyn crate::engagement::domain::port::LeadIntakeSubmissionRepository>,
     pub question_repo: Arc<dyn crate::engagement::domain::port::IntakeFormQuestionRepository>,
@@ -513,6 +514,7 @@ impl LeadIntakeService {
 
     /// Public: get the intake form for a lead by access token.
     /// Returns 410 Gone (via error) if already submitted.
+    #[allow(dead_code)]
     pub async fn get_public_form(
         &self,
         token: &str,
@@ -569,6 +571,7 @@ impl LeadIntakeService {
 }
 
 /// Intermediate struct for building the public form response.
+#[allow(dead_code)]
 pub struct PublicLeadIntakeFormData {
     pub submission_id: Uuid,
     pub therapist_id: Uuid,
@@ -587,6 +590,7 @@ impl BroadcastService {
         Self { broadcast }
     }
 
+    #[allow(dead_code)]
     pub async fn send_whatsapp(
         &self,
         phone: &str,
@@ -595,6 +599,7 @@ impl BroadcastService {
         self.broadcast.send_whatsapp(phone, body).await
     }
 
+    #[allow(dead_code)]
     pub async fn send_email(
         &self,
         to: &str,

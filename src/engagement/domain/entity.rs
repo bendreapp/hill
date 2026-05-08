@@ -206,14 +206,6 @@ pub struct SendLeadIntakeResponse {
     pub sent_at: DateTime<Utc>,
 }
 
-/// Public: data returned when lead opens their intake link
-#[derive(Debug, Clone, Serialize, utoipa::ToSchema)]
-pub struct PublicLeadIntakeForm {
-    pub therapist_display_name: String,
-    pub lead_name: String,
-    pub questions: Vec<crate::engagement::domain::entity::IntakeFormQuestion>,
-    pub already_submitted: bool,
-}
 
 /// Public: lead submits intake responses
 #[derive(Debug, Clone, Deserialize, utoipa::ToSchema)]

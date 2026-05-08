@@ -91,6 +91,7 @@ pub struct PracticeMember {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema, sqlx::FromRow)]
+#[allow(dead_code)]
 pub struct PracticeInvitation {
     pub id: Uuid,
     pub practice_id: Uuid,

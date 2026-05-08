@@ -6,6 +6,7 @@ use crate::iam::domain::entity::PracticeInvitation;
 use crate::iam::domain::error::IamError;
 use crate::iam::domain::port::InvitationRepository;
 
+#[allow(dead_code)]
 pub struct PgInvitationRepository {
     pool: PgPool,
 }

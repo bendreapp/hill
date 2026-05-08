@@ -285,6 +285,7 @@ impl MessageService {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn get_message(&self, id: Uuid) -> Result<Message, ClinicalError> {
         let mut msg = self
             .message_repo
@@ -331,6 +332,7 @@ impl MessageService {
         self.message_repo.mark_read(therapist_id, message_ids).await
     }
 
+    #[allow(dead_code)]
     pub async fn delete_message(&self, id: Uuid) -> Result<(), ClinicalError> {
         self.message_repo
             .find_by_id(id)

@@ -127,6 +127,7 @@ impl EncryptionService {
     }
 
     /// Encrypt a JSON-serializable value.
+    #[allow(dead_code)]
     pub fn encrypt_json<T: serde::Serialize>(&self, value: &T) -> Result<String, AppError> {
         let json = serde_json::to_string(value).map_err(|e| AppError::Encryption {
             message: format!("JSON serialization failed: {}", e),
@@ -135,6 +136,7 @@ impl EncryptionService {
     }
 
     /// Decrypt to a JSON-deserializable value.
+    #[allow(dead_code)]
     pub fn decrypt_json<T: serde::de::DeserializeOwned>(&self, data: &str) -> Result<T, AppError> {
         let json = self.decrypt(data)?;
         serde_json::from_str(&json).map_err(|e| AppError::Encryption {

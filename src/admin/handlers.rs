@@ -12,6 +12,7 @@ use crate::shared::error::AppError;
 
 // ─── Admin Auth Extractor ───────────────────────────────────────────────────
 
+#[allow(dead_code)]
 pub struct AdminUser {
     pub id: Uuid,
     pub email: String,

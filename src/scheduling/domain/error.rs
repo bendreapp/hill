@@ -1,6 +1,7 @@
 use crate::shared::error::AppError;
 
 #[derive(Debug, thiserror::Error)]
+#[allow(dead_code)]
 pub enum SchedulingError {
     #[error("Session not found")]
     SessionNotFound,

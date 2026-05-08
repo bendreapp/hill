@@ -21,6 +21,7 @@ impl PaymentService {
         }
     }
 
+    #[allow(dead_code)]
     pub async fn get_invoice(&self, id: Uuid, therapist_id: Uuid) -> Result<Invoice, BillingError> {
         self.invoice_repo
             .find_by_id(id, therapist_id)
