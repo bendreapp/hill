@@ -331,11 +331,12 @@ impl ClientPortalRepository for PgClientPortalRepository {
                 s.starts_at,
                 c.email as client_email,
                 c.full_name as client_name,
-                t.email as therapist_email,
+                COALESCE(au.email, '') as therapist_email,
                 COALESCE(t.display_name, t.full_name) as therapist_name
             FROM sessions s
             JOIN clients c ON s.client_id = c.id
             JOIN therapists t ON s.therapist_id = t.id
+            LEFT JOIN auth.users au ON t.id = au.id
             WHERE s.starts_at >= $1
               AND s.starts_at < $2
               AND s.status = 'scheduled'
