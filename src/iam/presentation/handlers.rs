@@ -197,9 +197,6 @@ pub async fn integration_status(
 #[derive(Debug, Deserialize)]
 pub struct SelectPlanBody {
     pub plan: String,
-    /// Therapist's email, passed from the client so we can attach it to the lead.
-    /// Optional — the frontend should send auth user email here.
-    pub email: Option<String>,
 }
 
 pub async fn select_plan(
@@ -208,7 +205,7 @@ pub async fn select_plan(
     body: web::Json<SelectPlanBody>,
 ) -> Result<HttpResponse, AppError> {
     let updated = therapist_svc
-        .select_plan(user.id, &body.plan, body.email.clone())
+        .select_plan(user.id, &body.plan)
         .await?;
     Ok(HttpResponse::Ok().json(updated))
 }

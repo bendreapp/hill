@@ -4,27 +4,22 @@ use uuid::Uuid;
 use crate::iam::domain::entity::*;
 use crate::iam::domain::error::IamError;
 use crate::iam::domain::port::*;
-use crate::leads::domain::entity::{CreateLeadInput};
-use crate::leads::domain::port::LeadRepository;
 
 // ─── Therapist Service ───────────────────────────────────────────────────────
 
 pub struct TherapistService {
     pub therapist_repo: Arc<dyn TherapistRepository>,
     pub availability_repo: Arc<dyn AvailabilityRepository>,
-    pub lead_repo: Arc<dyn LeadRepository>,
 }
 
 impl TherapistService {
     pub fn new(
         therapist_repo: Arc<dyn TherapistRepository>,
         availability_repo: Arc<dyn AvailabilityRepository>,
-        lead_repo: Arc<dyn LeadRepository>,
     ) -> Self {
         Self {
             therapist_repo,
             availability_repo,
-            lead_repo,
         }
     }
 
@@ -60,7 +55,6 @@ impl TherapistService {
         &self,
         user_id: Uuid,
         plan: &str,
-        email: Option<String>,
     ) -> Result<Therapist, IamError> {
         // Validate plan value
         let valid_plans = ["solo", "team", "clinic", "organization"];
@@ -79,18 +73,8 @@ impl TherapistService {
 
         let updated = self.therapist_repo.update(&therapist).await?;
 
-        // Create a lead entry in Bendre HQ so the team can see this signup
-        let lead_input = CreateLeadInput {
-            full_name: updated.full_name.clone(),
-            email,
-            phone: updated.phone.clone(),
-            reason: None,
-            source: Some("signup".to_string()),
-            preferred_times: None,
-            message: Some(format!("Plan selected: {}", plan)),
-        };
-        // Best-effort — don't fail the whole request if lead creation fails
-        let _ = self.lead_repo.create(user_id, &lead_input).await;
+        // HQ tracks signups via therapists table (plan_selected, plan_status, created_at)
+        // — no need to create a lead entry which would pollute the therapist's own leads view
 
         Ok(updated)
     }

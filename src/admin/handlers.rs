@@ -78,18 +78,6 @@ struct PlatformStats {
     new_clients_30d: i64,
 }
 
-#[derive(Serialize, sqlx::FromRow)]
-struct TherapistRow {
-    id: Uuid,
-    full_name: String,
-    display_name: Option<String>,
-    phone: Option<String>,
-    slug: String,
-    timezone: String,
-    booking_page_active: bool,
-    created_at: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
-}
 
 #[derive(Serialize, sqlx::FromRow)]
 struct WaitlistRow {
@@ -117,28 +105,6 @@ struct SignupDay {
     count: i64,
 }
 
-#[derive(Serialize)]
-struct TherapistDetail {
-    #[serde(flatten)]
-    therapist: TherapistDetailRow,
-    client_count: i64,
-    session_count: i64,
-    completed_count: i64,
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-struct TherapistDetailRow {
-    id: Uuid,
-    full_name: String,
-    display_name: Option<String>,
-    phone: Option<String>,
-    slug: String,
-    timezone: String,
-    qualifications: Option<String>,
-    booking_page_active: bool,
-    created_at: chrono::DateTime<chrono::Utc>,
-    updated_at: chrono::DateTime<chrono::Utc>,
-}
 
 #[derive(Deserialize)]
 pub struct LimitQuery {
@@ -184,63 +150,6 @@ pub async fn platform_stats(
     }))
 }
 
-pub async fn list_therapists(
-    _admin: AdminUser,
-    pool: web::Data<PgPool>,
-) -> Result<HttpResponse, AppError> {
-    let rows = sqlx::query_as::<_, TherapistRow>(
-        "SELECT id, full_name, display_name, phone, slug, timezone, booking_page_active, created_at, updated_at
-         FROM therapists ORDER BY created_at DESC"
-    )
-    .fetch_all(pool.get_ref())
-    .await
-    .map_err(|e| {
-        tracing::error!("Admin therapists query error: {}", e);
-        AppError::internal("Failed to fetch therapists")
-    })?;
-
-    Ok(HttpResponse::Ok().json(rows))
-}
-
-pub async fn therapist_detail(
-    _admin: AdminUser,
-    pool: web::Data<PgPool>,
-    id: web::Path<Uuid>,
-) -> Result<HttpResponse, AppError> {
-    let therapist = sqlx::query_as::<_, TherapistDetailRow>(
-        "SELECT id, full_name, display_name, phone, slug, timezone, qualifications, booking_page_active, created_at, updated_at
-         FROM therapists WHERE id = $1"
-    )
-    .bind(id.into_inner())
-    .fetch_optional(pool.get_ref())
-    .await
-    .map_err(|e| {
-        tracing::error!("Admin therapist detail error: {}", e);
-        AppError::internal("Failed to fetch therapist")
-    })?
-    .ok_or_else(|| AppError::not_found("Therapist"))?;
-
-    let counts = sqlx::query_as::<_, (i64, i64, i64)>(
-        "SELECT
-            (SELECT COUNT(*) FROM clients WHERE therapist_id = $1 AND deleted_at IS NULL)::bigint,
-            (SELECT COUNT(*) FROM sessions WHERE therapist_id = $1 AND deleted_at IS NULL)::bigint,
-            (SELECT COUNT(*) FROM sessions WHERE therapist_id = $1 AND status = 'completed')::bigint"
-    )
-    .bind(therapist.id)
-    .fetch_one(pool.get_ref())
-    .await
-    .map_err(|e| {
-        tracing::error!("Admin therapist counts error: {}", e);
-        AppError::internal("Failed to fetch counts")
-    })?;
-
-    Ok(HttpResponse::Ok().json(TherapistDetail {
-        therapist,
-        client_count: counts.0,
-        session_count: counts.1,
-        completed_count: counts.2,
-    }))
-}
 
 pub async fn list_waitlist(
     _admin: AdminUser,
@@ -373,15 +282,270 @@ pub async fn client_stats(
     }))
 }
 
+// ─── Plan Management ─────────────────────────────────────────────────────────
+
+pub async fn activate_plan(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let therapist_id = id.into_inner();
+    let updated = sqlx::query_scalar::<_, Uuid>(
+        "UPDATE therapists SET plan_status = 'active', updated_at = NOW()
+         WHERE id = $1 RETURNING id"
+    )
+    .bind(therapist_id)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin activate plan error: {}", e);
+        AppError::internal("Failed to activate plan")
+    })?;
+
+    if updated.is_none() {
+        return Err(AppError::not_found("Therapist"));
+    }
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "status": "active" })))
+}
+
+pub async fn suspend_plan(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let therapist_id = id.into_inner();
+    let updated = sqlx::query_scalar::<_, Uuid>(
+        "UPDATE therapists SET plan_status = 'suspended', updated_at = NOW()
+         WHERE id = $1 RETURNING id"
+    )
+    .bind(therapist_id)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin suspend plan error: {}", e);
+        AppError::internal("Failed to suspend plan")
+    })?;
+
+    if updated.is_none() {
+        return Err(AppError::not_found("Therapist"));
+    }
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({ "status": "suspended" })))
+}
+
+// ─── Leads ───────────────────────────────────────────────────────────────────
+
+#[derive(Serialize, sqlx::FromRow)]
+struct LeadRow {
+    id: Uuid,
+    full_name: String,
+    email: Option<String>,
+    therapist_name: String,
+    status: String,
+    source: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn list_leads(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, AppError> {
+    let rows = sqlx::query_as::<_, LeadRow>(
+        "SELECT l.id, l.full_name, l.email,
+                COALESCE(t.display_name, t.full_name) AS therapist_name,
+                l.status::text AS status,
+                l.source,
+                l.created_at
+         FROM leads l
+         JOIN therapists t ON t.id = l.therapist_id
+         ORDER BY l.created_at DESC
+         LIMIT 500"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin leads query error: {}", e);
+        AppError::internal("Failed to fetch leads")
+    })?;
+
+    Ok(HttpResponse::Ok().json(rows))
+}
+
+// ─── Revenue ─────────────────────────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct RevenueStats {
+    total_invoiced: i64,
+    total_collected: i64,
+    total_outstanding: i64,
+    invoice_count: i64,
+    paid_count: i64,
+}
+
+pub async fn revenue_stats(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, AppError> {
+    let row = sqlx::query_as::<_, (i64, i64, i64, i64, i64)>(
+        "SELECT
+            COALESCE(SUM(total_inr), 0)::bigint,
+            COALESCE(SUM(CASE WHEN status::text = 'paid' THEN total_inr ELSE 0 END), 0)::bigint,
+            COALESCE(SUM(CASE WHEN status::text = 'unpaid' THEN total_inr ELSE 0 END), 0)::bigint,
+            COUNT(*)::bigint,
+            COALESCE(SUM(CASE WHEN status::text = 'paid' THEN 1 ELSE 0 END), 0)::bigint
+         FROM invoices"
+    )
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin revenue stats error: {}", e);
+        AppError::internal("Failed to fetch revenue stats")
+    })?;
+
+    Ok(HttpResponse::Ok().json(RevenueStats {
+        total_invoiced: row.0,
+        total_collected: row.1,
+        total_outstanding: row.2,
+        invoice_count: row.3,
+        paid_count: row.4,
+    }))
+}
+
+// ─── Enhanced Therapist List ──────────────────────────────────────────────────
+
+#[derive(Serialize, sqlx::FromRow)]
+struct TherapistListRow {
+    id: Uuid,
+    full_name: String,
+    display_name: Option<String>,
+    email: Option<String>,
+    phone: Option<String>,
+    slug: String,
+    timezone: String,
+    booking_page_active: bool,
+    plan_selected: Option<String>,
+    plan_status: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+pub async fn list_therapists_v2(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+) -> Result<HttpResponse, AppError> {
+    let rows = sqlx::query_as::<_, TherapistListRow>(
+        "SELECT t.id, t.full_name, t.display_name,
+                au.email,
+                t.phone, t.slug, t.timezone, t.booking_page_active,
+                t.plan_selected, COALESCE(t.plan_status, 'pending') AS plan_status,
+                t.created_at, t.updated_at
+         FROM therapists t
+         LEFT JOIN auth.users au ON au.id = t.id
+         ORDER BY t.created_at DESC"
+    )
+    .fetch_all(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin therapists v2 query error: {}", e);
+        AppError::internal("Failed to fetch therapists")
+    })?;
+
+    Ok(HttpResponse::Ok().json(rows))
+}
+
+// ─── Enhanced Therapist Detail ────────────────────────────────────────────────
+
+#[derive(Serialize, sqlx::FromRow)]
+struct TherapistDetailRowV2 {
+    id: Uuid,
+    full_name: String,
+    display_name: Option<String>,
+    email: Option<String>,
+    phone: Option<String>,
+    slug: String,
+    timezone: String,
+    qualifications: Option<String>,
+    booking_page_active: bool,
+    plan_selected: Option<String>,
+    plan_status: String,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Serialize)]
+struct TherapistDetailV2 {
+    #[serde(flatten)]
+    therapist: TherapistDetailRowV2,
+    client_count: i64,
+    session_count: i64,
+    completed_count: i64,
+    lead_count: i64,
+}
+
+pub async fn therapist_detail_v2(
+    _admin: AdminUser,
+    pool: web::Data<PgPool>,
+    id: web::Path<Uuid>,
+) -> Result<HttpResponse, AppError> {
+    let therapist_id = id.into_inner();
+
+    let therapist = sqlx::query_as::<_, TherapistDetailRowV2>(
+        "SELECT t.id, t.full_name, t.display_name,
+                au.email,
+                t.phone, t.slug, t.timezone, t.qualifications, t.booking_page_active,
+                t.plan_selected, COALESCE(t.plan_status, 'pending') AS plan_status,
+                t.created_at, t.updated_at
+         FROM therapists t
+         LEFT JOIN auth.users au ON au.id = t.id
+         WHERE t.id = $1"
+    )
+    .bind(therapist_id)
+    .fetch_optional(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin therapist detail v2 error: {}", e);
+        AppError::internal("Failed to fetch therapist")
+    })?
+    .ok_or_else(|| AppError::not_found("Therapist"))?;
+
+    let counts = sqlx::query_as::<_, (i64, i64, i64, i64)>(
+        "SELECT
+            (SELECT COUNT(*) FROM clients WHERE therapist_id = $1 AND deleted_at IS NULL)::bigint,
+            (SELECT COUNT(*) FROM sessions WHERE therapist_id = $1 AND deleted_at IS NULL)::bigint,
+            (SELECT COUNT(*) FROM sessions WHERE therapist_id = $1 AND status = 'completed')::bigint,
+            (SELECT COUNT(*) FROM leads WHERE therapist_id = $1)::bigint"
+    )
+    .bind(therapist_id)
+    .fetch_one(pool.get_ref())
+    .await
+    .map_err(|e| {
+        tracing::error!("Admin therapist counts v2 error: {}", e);
+        AppError::internal("Failed to fetch counts")
+    })?;
+
+    Ok(HttpResponse::Ok().json(TherapistDetailV2 {
+        therapist,
+        client_count: counts.0,
+        session_count: counts.1,
+        completed_count: counts.2,
+        lead_count: counts.3,
+    }))
+}
+
 // ─── Route Configuration ────────────────────────────────────────────────────
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg
         .route("/api/v1/admin/stats", web::get().to(platform_stats))
-        .route("/api/v1/admin/therapists", web::get().to(list_therapists))
-        .route("/api/v1/admin/therapists/{id}", web::get().to(therapist_detail))
+        .route("/api/v1/admin/therapists", web::get().to(list_therapists_v2))
+        .route("/api/v1/admin/therapists/{id}", web::get().to(therapist_detail_v2))
+        .route("/api/v1/admin/therapists/{id}/activate-plan", web::post().to(activate_plan))
+        .route("/api/v1/admin/therapists/{id}/suspend", web::post().to(suspend_plan))
         .route("/api/v1/admin/waitlist", web::get().to(list_waitlist))
         .route("/api/v1/admin/sessions/recent", web::get().to(recent_sessions))
         .route("/api/v1/admin/signups-by-day", web::get().to(signups_by_day))
-        .route("/api/v1/admin/clients/stats", web::get().to(client_stats));
+        .route("/api/v1/admin/clients/stats", web::get().to(client_stats))
+        .route("/api/v1/admin/leads", web::get().to(list_leads))
+        .route("/api/v1/admin/revenue", web::get().to(revenue_stats));
 }
